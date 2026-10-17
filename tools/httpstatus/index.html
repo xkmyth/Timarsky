@@ -15,6 +15,12 @@
 <script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "SoftwareApplication", "name": "HTTP 状态码", "description": "查状态码含义与常见成因，写接口排查问题时随手看", "url": "https://xkmyth.github.io/Timarsky/tools/httpstatus/", "applicationCategory": "UtilitiesApplication", "operatingSystem": "Web", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "CNY"}, "isPartOf": {"@type": "WebSite", "name": "xkmyth 在线工具箱", "url": "https://xkmyth.github.io/Timarsky/tools/"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "首页", "item": "https://xkmyth.github.io/"}, {"@type": "ListItem", "position": 2, "name": "在线工具箱", "item": "https://xkmyth.github.io/Timarsky/tools/"}, {"@type": "ListItem", "position": 3, "name": "HTTP 状态码", "item": "https://xkmyth.github.io/Timarsky/tools/httpstatus/"}]}]}</script>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='45' r='16' fill='%23fcd34d'/><path d='M50 20v50M25 45h50' stroke='%23fcd34d' stroke-width='6'/><ellipse cx='50' cy='66' rx='26' ry='8' stroke='%239ae3ff' stroke-width='3' fill='none' transform='rotate(-15 50 66)'/></svg>">
 <link rel="stylesheet" href="../tools.css">
+<meta property="og:image" content="https://xkmyth.github.io/icons/og-tools.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:title" content="HTTP 状态码 · 在线工具 · xkmyth">
+<meta name="twitter:description" content="查状态码含义与常见成因，写接口排查问题时随手看 — 在线HTTP 状态码，纯前端本地计算，数据不出浏览器。">
+<meta name="twitter:image" content="https://xkmyth.github.io/icons/og-tools.png">
 </head>
 <body>
 <canvas id="sky"></canvas>
@@ -67,8 +73,8 @@
         <ol class="tp-steps"><li>把代码或数据结构粘进输入框</li><li>选择风格或参数</li><li>结果可复制；语法有错会指出位置</li></ol>
       </section>
       <section class="tp-card">
-        <h2 class="tp-h2">长得什么样</h2>
-        <pre class="tp-ex">429 → 请求过多，看 Retry-After；401 → 未认证</pre>
+        <h2 class="tp-h2">长得什么样<button class="tiny-btn copy-ex" type="button" id="copyEx">复制示例</button></h2>
+        <pre class="tp-ex" id="exText">429 → 请求过多，看 Retry-After；401 → 未认证</pre>
       </section>
       <section class="tp-card tp-card-tip">
         <h2 class="tp-h2">注意</h2>
@@ -83,7 +89,20 @@
           <li><a href="../jsonflat/">🪜 JSON 扁平化</a></li>
           <li><a href="../jsonesc/">🔀 JSON 字符串转义</a></li></ul>
       </section>
-    </aside>
+    
+  <div class="tp-card">
+    <h2 class="tp-h2">这套流程里的其他工具</h2>
+    <p class="tp-flow-why">这些工具常在同一个任务里前后出现，按顺序用下来最省事。</p>
+    <ul class="tp-rel">
+      <li><a href="../json/">🧾 JSON 美化 / 校验</a></li>
+      <li><a href="../diff/">🆚 文本对比</a></li>
+      <li><a href="../hash/">#️⃣ SHA 哈希</a></li>
+      <li><a href="../crc32/">🧾 CRC32 校验</a></li>
+      <li><a href="../mime/">📎 MIME 类型速查</a></li>
+    </ul>
+    <p class="tp-flow-more"><a href="https://xkmyth.github.io/collections/#combo-1">看「上线前十分钟」整套 →</a></p>
+  </div>
+</aside>
   </div>
 
   <nav class="tp-pager" aria-label="上下一个工具">
@@ -118,6 +137,30 @@
       }, function () { window.prompt('复制这个链接：', url); });
     } else {
       window.prompt('复制这个链接：', url);
+    }
+  });
+})();
+</script>
+
+<script>
+(function () {
+  var btn = document.getElementById('copyEx');
+  if (!btn) return;
+  btn.addEventListener('click', function () {
+    var el = document.getElementById('exText');
+    if (!el) return;
+    var text = (el.innerText || el.textContent || '').trim();
+    var done = function () {
+      btn.textContent = '已复制';
+      setTimeout(function () { btn.textContent = '复制示例'; }, 1600);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, function () {});
+    } else {
+      var ta = document.createElement('textarea');
+      ta.value = text; document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); done(); } catch (e) {}
+      document.body.removeChild(ta);
     }
   });
 })();

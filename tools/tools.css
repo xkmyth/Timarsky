@@ -352,3 +352,13 @@ body.light .tp-prev, body.light .tp-next { background: #fff; color: #1a2340; }
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
 }
+
+/* ---- 第十三轮：详情页复制示例 / 目录页随机按钮 ---- */
+.tp-h2 .copy-ex { margin-left: 10px; vertical-align: 2px; }
+.tp-ex { position: relative; }
+.tiny-btn.copy-ex { font-size: 12px; padding: 3px 9px; border-radius: 999px; }
+
+/* ---- 第十三轮：详情页「这套流程里的其他工具」 ---- */
+.tp-flow-why { color: var(--muted); font-size: 13.5px; margin: 0 0 10px; }
+.tp-flow-more { margin: 12px 0 0; font-size: 13.5px; }
+.tp-flow-more a { color: var(--gold); }

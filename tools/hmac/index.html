@@ -15,6 +15,12 @@
 <script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "SoftwareApplication", "name": "HMAC 签名", "description": "用密钥对消息做 HMAC-SHA256，输出十六进制与 base64，接口验签常用", "url": "https://xkmyth.github.io/Timarsky/tools/hmac/", "applicationCategory": "UtilitiesApplication", "operatingSystem": "Web", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "CNY"}, "isPartOf": {"@type": "WebSite", "name": "xkmyth 在线工具箱", "url": "https://xkmyth.github.io/Timarsky/tools/"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "首页", "item": "https://xkmyth.github.io/"}, {"@type": "ListItem", "position": 2, "name": "在线工具箱", "item": "https://xkmyth.github.io/Timarsky/tools/"}, {"@type": "ListItem", "position": 3, "name": "HMAC 签名", "item": "https://xkmyth.github.io/Timarsky/tools/hmac/"}]}]}</script>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='45' r='16' fill='%23fcd34d'/><path d='M50 20v50M25 45h50' stroke='%23fcd34d' stroke-width='6'/><ellipse cx='50' cy='66' rx='26' ry='8' stroke='%239ae3ff' stroke-width='3' fill='none' transform='rotate(-15 50 66)'/></svg>">
 <link rel="stylesheet" href="../tools.css">
+<meta property="og:image" content="https://xkmyth.github.io/icons/og-tools.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:title" content="HMAC 签名 · 在线工具 · xkmyth">
+<meta name="twitter:description" content="用密钥对消息做 HMAC-SHA256，输出十六进制与 base64，接口验签常用 — 在线HMAC 签名，纯前端本地计算，数据不出浏览器。">
+<meta name="twitter:image" content="https://xkmyth.github.io/icons/og-tools.png">
 </head>
 <body>
 <canvas id="sky"></canvas>
@@ -67,8 +73,8 @@
         <ol class="tp-steps"><li>填消息、密码或密钥</li><li>设置算法与参数</li><li>点执行，输出哈希 / 签名 / 动态码</li></ol>
       </section>
       <section class="tp-card">
-        <h2 class="tp-h2">长得什么样</h2>
-        <pre class="tp-ex">HMAC-SHA256(secret, "payload") → 9f2c…（hex）</pre>
+        <h2 class="tp-h2">长得什么样<button class="tiny-btn copy-ex" type="button" id="copyEx">复制示例</button></h2>
+        <pre class="tp-ex" id="exText">HMAC-SHA256(secret, "payload") → 9f2c…（hex）</pre>
       </section>
       <section class="tp-card tp-card-tip">
         <h2 class="tp-h2">注意</h2>
@@ -83,7 +89,20 @@
           <li><a href="../totp/">🔢 TOTP 验证码</a></li>
           <li><a href="../passphrase/">📝 口令短语生成</a></li></ul>
       </section>
-    </aside>
+    
+  <div class="tp-card">
+    <h2 class="tp-h2">这套流程里的其他工具</h2>
+    <p class="tp-flow-why">这些工具常在同一个任务里前后出现，按顺序用下来最省事。</p>
+    <ul class="tp-rel">
+      <li><a href="../pwd/">🔑 密码生成器</a></li>
+      <li><a href="../passphrase/">📝 口令短语生成</a></li>
+      <li><a href="../entropy/">📈 密码熵值</a></li>
+      <li><a href="../totp/">🔢 TOTP 验证码</a></li>
+      <li><a href="../policychk/">✅ 密码规则检查</a></li>
+    </ul>
+    <p class="tp-flow-more"><a href="https://xkmyth.github.io/collections/#combo-4">看「账号与密码」整套 →</a></p>
+  </div>
+</aside>
   </div>
 
   <nav class="tp-pager" aria-label="上下一个工具">
@@ -118,6 +137,30 @@
       }, function () { window.prompt('复制这个链接：', url); });
     } else {
       window.prompt('复制这个链接：', url);
+    }
+  });
+})();
+</script>
+
+<script>
+(function () {
+  var btn = document.getElementById('copyEx');
+  if (!btn) return;
+  btn.addEventListener('click', function () {
+    var el = document.getElementById('exText');
+    if (!el) return;
+    var text = (el.innerText || el.textContent || '').trim();
+    var done = function () {
+      btn.textContent = '已复制';
+      setTimeout(function () { btn.textContent = '复制示例'; }, 1600);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, function () {});
+    } else {
+      var ta = document.createElement('textarea');
+      ta.value = text; document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); done(); } catch (e) {}
+      document.body.removeChild(ta);
     }
   });
 })();

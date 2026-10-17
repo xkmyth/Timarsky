@@ -15,6 +15,12 @@
 <script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "SoftwareApplication", "name": "URL 结构拆解", "description": "把一条链接拆成协议、主机、端口、路径、查询与锚点，并给出规范化结果", "url": "https://xkmyth.github.io/Timarsky/tools/urlparts/", "applicationCategory": "UtilitiesApplication", "operatingSystem": "Web", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "CNY"}, "isPartOf": {"@type": "WebSite", "name": "xkmyth 在线工具箱", "url": "https://xkmyth.github.io/Timarsky/tools/"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "首页", "item": "https://xkmyth.github.io/"}, {"@type": "ListItem", "position": 2, "name": "在线工具箱", "item": "https://xkmyth.github.io/Timarsky/tools/"}, {"@type": "ListItem", "position": 3, "name": "URL 结构拆解", "item": "https://xkmyth.github.io/Timarsky/tools/urlparts/"}]}]}</script>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='45' r='16' fill='%23fcd34d'/><path d='M50 20v50M25 45h50' stroke='%23fcd34d' stroke-width='6'/><ellipse cx='50' cy='66' rx='26' ry='8' stroke='%239ae3ff' stroke-width='3' fill='none' transform='rotate(-15 50 66)'/></svg>">
 <link rel="stylesheet" href="../tools.css">
+<meta property="og:image" content="https://xkmyth.github.io/icons/og-tools.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:title" content="URL 结构拆解 · 在线工具 · xkmyth">
+<meta name="twitter:description" content="把一条链接拆成协议、主机、端口、路径、查询与锚点，并给出规范化结果 — 在线URL 结构拆解，纯前端本地计算，数据不出浏览器。">
+<meta name="twitter:image" content="https://xkmyth.github.io/icons/og-tools.png">
 </head>
 <body>
 <canvas id="sky"></canvas>
@@ -67,8 +73,8 @@
         <ol class="tp-steps"><li>填地址、端口或链接</li><li>选择要做的换算或判断</li><li>分层结果逐项列出</li></ol>
       </section>
       <section class="tp-card">
-        <h2 class="tp-h2">长得什么样</h2>
-        <pre class="tp-ex">https://a.com:8443/x?y=1#z → 协议 https · 主机 a.com · 端口 8443 · 路径 /x</pre>
+        <h2 class="tp-h2">长得什么样<button class="tiny-btn copy-ex" type="button" id="copyEx">复制示例</button></h2>
+        <pre class="tp-ex" id="exText">https://a.com:8443/x?y=1#z → 协议 https · 主机 a.com · 端口 8443 · 路径 /x</pre>
       </section>
       <section class="tp-card tp-card-tip">
         <h2 class="tp-h2">注意</h2>
@@ -83,7 +89,20 @@
           <li><a href="../iprange/">📶 IP 连续范围</a></li>
           <li><a href="../privateip/">🏠 内网地址判断</a></li></ul>
       </section>
-    </aside>
+    
+  <div class="tp-card">
+    <h2 class="tp-h2">这套流程里的其他工具</h2>
+    <p class="tp-flow-why">这些工具常在同一个任务里前后出现，按顺序用下来最省事。</p>
+    <ul class="tp-rel">
+      <li><a href="../qsparse/">🔗 查询串解析 / 构造</a></li>
+      <li><a href="../jwt/">🎫 JWT 解码</a></li>
+      <li><a href="../hexdump/">🧱 十六进制视图</a></li>
+      <li><a href="../unicode/">🔣 字符编码查询</a></li>
+      <li><a href="../ts/">⏱️ 时间戳转换</a></li>
+    </ul>
+    <p class="tp-flow-more"><a href="https://xkmyth.github.io/collections/#combo-3">看「排线上问题」整套 →</a></p>
+  </div>
+</aside>
   </div>
 
   <nav class="tp-pager" aria-label="上下一个工具">
@@ -118,6 +137,30 @@
       }, function () { window.prompt('复制这个链接：', url); });
     } else {
       window.prompt('复制这个链接：', url);
+    }
+  });
+})();
+</script>
+
+<script>
+(function () {
+  var btn = document.getElementById('copyEx');
+  if (!btn) return;
+  btn.addEventListener('click', function () {
+    var el = document.getElementById('exText');
+    if (!el) return;
+    var text = (el.innerText || el.textContent || '').trim();
+    var done = function () {
+      btn.textContent = '已复制';
+      setTimeout(function () { btn.textContent = '复制示例'; }, 1600);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(done, function () {});
+    } else {
+      var ta = document.createElement('textarea');
+      ta.value = text; document.body.appendChild(ta); ta.select();
+      try { document.execCommand('copy'); done(); } catch (e) {}
+      document.body.removeChild(ta);
     }
   });
 })();
