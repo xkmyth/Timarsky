@@ -362,3 +362,64 @@ body.light .tp-prev, body.light .tp-next { background: #fff; color: #1a2340; }
 .tp-flow-why { color: var(--muted); font-size: 13.5px; margin: 0 0 10px; }
 .tp-flow-more { margin: 12px 0 0; font-size: 13.5px; }
 .tp-flow-more a { color: var(--gold); }
+
+/* ============================================================
+   浅色主题（与主站同一套 token，跟随工具箱主页的开关）
+   ============================================================ */
+html.theme-light { color-scheme: light; }
+html.theme-light body {
+  --bg0: #f6f8ff; --bg1: #eef2ff; --bg2: #e3e9ff; --bg3: #d8e2ff;
+  --gold: #9d470a; --gold2: #b45309; --ice: #0e7490;
+  --text: #101a33; --muted: #4a5b80;
+  --card: rgba(255,255,255,.82); --card-hover: #ffffff;
+  --line: rgba(16,26,51,.12); --line-ice: rgba(14,116,144,.25);
+  --ok: #047857; --bad: #be123c;
+  background: var(--bg0); color: var(--text);
+}
+html.theme-light #sky {
+  background: linear-gradient(160deg, #f6f8ff 0%, #eef2ff 45%, #e3e9ff 78%, #d8e2ff 100%);
+}
+html.theme-light .header { background: rgba(246,248,255,.86); }
+html.theme-light .hero-title {
+  background: linear-gradient(120deg, #101a33, #0e7490 55%, #101a33);
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+}
+html.theme-light .chip,
+html.theme-light .chip.active,
+html.theme-light .t-btn { color: #fdf8ee; }
+html.theme-light .chip { background: rgba(16,26,51,.05); color: var(--muted); }
+html.theme-light .chip.active { background: var(--gold); color: #fff; }
+html.theme-light .t-btn { background: var(--gold); color: #fff; }
+html.theme-light .t-btn.ghost,
+html.theme-light .tiny-btn { background: rgba(16,26,51,.05); color: var(--text); }
+html.theme-light .field input,
+html.theme-light .field textarea,
+html.theme-light .field select,
+html.theme-light .tsearch input,
+html.theme-light .out,
+html.theme-light .tool,
+html.theme-light .tp-card,
+html.theme-light .tp-ex,
+html.theme-light .toolbar,
+html.theme-light .md-pre,
+html.theme-light .md-code,
+html.theme-light .diff-box,
+html.theme-light .tsearch,
+html.theme-light .swatch {
+  background: rgba(16,26,51,.04);
+  border-color: rgba(16,26,51,.14);
+}
+html.theme-light .md-table th { background: rgba(16,26,51,.06); }
+html.theme-light .md-table th, html.theme-light .md-table td { border-color: rgba(16,26,51,.14); }
+html.theme-light .diff-line.add { background: rgba(4,120,87,.12); color: #065f46; }
+html.theme-light .diff-line.del { background: rgba(190,18,60,.12); color: #9f1239; }
+html.theme-light .bar { background: rgba(16,26,51,.1); }
+html.theme-light .ripple { background: rgba(16,26,51,.16); }
+html.theme-light .out.err { color: #9f1239; }
+html.theme-light .tp-prev, html.theme-light .tp-next { background: rgba(16,26,51,.04); color: var(--text); }
+.theme-btn {
+  background: none; border: 1px solid var(--line); color: var(--muted); cursor: pointer;
+  font: inherit; font-size: 13px; line-height: 1; padding: 7px 10px; border-radius: 10px;
+  transition: color .2s, border-color .2s, background .2s;
+}
+.theme-btn:hover { color: var(--gold); border-color: var(--line-ice); background: var(--card-hover); }

@@ -5964,4 +5964,34 @@
       if (document.hidden) stop(); else start();
     });
   }
+
+  /* ---------------- 主题（跟随工具箱主页的开关） ---------------- */
+  (function theme() {
+    var root = document.documentElement;
+    var btn = null;
+    function paint() {
+      var light = root.classList.contains('theme-light');
+      if (btn) {
+        btn.textContent = light ? '☾' : '☀';
+        btn.title = light ? '切到深色' : '切到浅色';
+        btn.setAttribute('aria-label', btn.title);
+      }
+    }
+    function toggle() {
+      var light = root.classList.toggle('theme-light');
+      try { localStorage.setItem('xkmyth-theme', light ? 'light' : 'dark'); } catch (e) {}
+      paint();
+      if (window.xkmythUI && window.xkmythUI.toast) window.xkmythUI.toast(light ? '浅色模式' : '深色模式', 'ok');
+    }
+    var host = document.querySelector('.header .nav') || document.querySelector('.tp-actions') || document.querySelector('.header');
+    if (host) {
+      btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'theme-btn';
+      btn.addEventListener('click', toggle);
+      host.appendChild(btn);
+      paint();
+    }
+  })();
+
 })();
