@@ -2,7 +2,7 @@
   "id": "/Timarsky/tools/",
   "name": "xkmyth 在线工具箱",
   "short_name": "工具箱",
-  "description": "139 个纯前端工具：编码、文本、时间、安全、数值、开发、计算、网络、文件。数据不出浏览器。",
+  "description": "160 个纯前端工具：编码、文本、时间、安全、数值、开发、计算、网络、文件。数据不出浏览器。",
   "start_url": "/Timarsky/tools/",
   "scope": "/Timarsky/tools/",
   "display": "standalone",
