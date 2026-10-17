@@ -17,19 +17,15 @@ function copyContent(id) {
   }).catch(() => alert('复制失败，请手动复制'));
 }
 
-// ===== 搜索功能 =====
-let searchTimer = null;
+// ===== 搜索框（类名样式化，见 style.css）=====
 function initSearch() {
   const searchBox = document.createElement('div');
   searchBox.innerHTML = `
-    <div style="max-width:600px;margin:0 auto;position:relative">
-      <input type="text" id="searchInput" placeholder="🔍 搜索工具... 例如：Ctrl+C、CAD、Word..."
-        style="width:100%;padding:14px 20px;border-radius:30px;border:1px solid rgba(255,255,255,0.15);
-        background:rgba(0,0,0,0.4);color:#fff;font-size:16px;outline:none;backdrop-filter:blur(8px)">
-      <span id="searchCount" style="position:absolute;right:16px;top:50%;transform:translateY(-50%);
-        font-size:13px;color:#888;pointer-events:none"></span>
+    <div class="search-wrap">
+      <input type="text" id="searchInput" placeholder="🔍 搜索工具... 例如：Ctrl+C、CAD、Word...">
+      <span id="searchCount" class="search-count"></span>
     </div>`;
-  
+
   const banner = document.querySelector('.banner');
   if (banner) banner.after(searchBox);
 
@@ -39,6 +35,7 @@ function initSearch() {
   });
 }
 
+let searchTimer = null;
 function searchTools(q) {
   const cards = document.querySelectorAll('.tool-card');
   const modules = document.querySelectorAll('.module');
@@ -60,7 +57,6 @@ function searchTools(q) {
     if (match) visible++;
   });
 
-  // Hide empty modules
   modules.forEach(m => {
     const hasVisible = [...m.querySelectorAll('.tool-card')].some(c => c.style.display !== 'none');
     m.style.display = hasVisible ? '' : 'none';
@@ -69,17 +65,42 @@ function searchTools(q) {
   if (count) count.innerText = visible > 0 ? `${visible} 个结果` : '无结果';
 }
 
-// ===== 深色/浅色切换 =====
-document.addEventListener('DOMContentLoaded', function() {
-  // Init search
-  initSearch();
+// ===== 模块速览 chips（自动从所有模块标题生成）=====
+function buildChips() {
+  const modules = document.querySelectorAll('.module');
+  if (!modules.length) return;
+  const bar = document.createElement('div');
+  bar.className = 'chips';
+  modules.forEach(m => {
+    const h = m.querySelector('h2');
+    if (!h || !m.id) return;
+    const a = document.createElement('a');
+    a.className = 'chip';
+    a.href = '#' + m.id;
+    a.textContent = h.textContent.replace(/（\d+个?）/, '').trim();
+    bar.appendChild(a);
+  });
+  const search = document.querySelector('.search-wrap');
+  if (search) search.after(bar);
+}
 
-  // Theme toggle
+// ===== 深色/浅色切换（带记忆）=====
+document.addEventListener('DOMContentLoaded', function() {
+  initSearch();
+  buildChips();
+
   const themeBtn = document.getElementById('themeToggle');
   if (themeBtn) {
+    const apply = (light) => {
+      document.body.classList.toggle('light', light);
+      themeBtn.innerText = light ? '深色模式' : '浅色模式';
+      try { localStorage.setItem('xkmyth-theme', light ? 'light' : 'dark'); } catch (e) {}
+    };
+    let saved = null;
+    try { saved = localStorage.getItem('xkmyth-theme'); } catch (e) {}
+    if (saved === 'light') apply(true);
     themeBtn.addEventListener('click', function() {
-      document.body.classList.toggle('light');
-      this.innerText = document.body.classList.contains('light') ? '深色模式' : '浅色模式';
+      apply(!document.body.classList.contains('light'));
     });
   }
 });

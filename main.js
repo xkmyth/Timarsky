@@ -1,38 +1,56 @@
-// ===== 星空动画 =====
-const canvas = document.getElementById('stars');
-const ctx = canvas.getContext('2d');
+// ===== 星空动画（DPR 降采样 · 后台暂停 · reduced-motion 全关）=====
+(function () {
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-function resizeCanvas() {
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
-}
-window.addEventListener('resize', resizeCanvas);
-resizeCanvas();
+  const yearEl = document.getElementById('year');
+  if (yearEl) yearEl.textContent = String(new Date().getFullYear());
 
-const stars = [];
-for (let i = 0; i < 200; i++) {
-  stars.push({
-    x: Math.random() * canvas.width,
-    y: Math.random() * canvas.height,
-    r: Math.random() * 2 + 0.3,
-    speed: Math.random() * 0.3 + 0.05,
-    alpha: Math.random()
-  });
-}
+  const canvas = document.getElementById('stars');
+  if (!canvas || reduceMotion) return;
+  const ctx = canvas.getContext('2d');
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  let W = 0, H = 0, running = true;
 
-function drawStars() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  for (const s of stars) {
-    s.alpha += 0.01;
-    if (s.alpha > 1 || s.alpha < 0.2) s.alpha = 0.2;
-    ctx.beginPath();
-    ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-    ctx.fillStyle = `rgba(255,255,255,${Math.abs(Math.sin(s.alpha))})`;
-    ctx.fill();
+  function resizeCanvas() {
+    W = innerWidth; H = innerHeight;
+    canvas.width = Math.floor(W * dpr);
+    canvas.height = Math.floor(H * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
+  window.addEventListener('resize', resizeCanvas);
+  resizeCanvas();
+
+  const stars = [];
+  for (let i = 0; i < 180; i++) {
+    stars.push({
+      x: Math.random(),
+      y: Math.random(),
+      r: Math.random() * 1.8 + 0.3,
+      alpha: Math.random() * Math.PI * 2,
+      c: i % 7 === 0 ? '252,211,77' : (i % 13 === 0 ? '154,227,255' : '255,255,255')
+    });
+  }
+
+  function drawStars() {
+    if (!running) return;
+    ctx.clearRect(0, 0, W, H);
+    for (const s of stars) {
+      const a = Math.abs(Math.sin(s.alpha)) * 0.85;
+      s.alpha += 0.01;
+      ctx.beginPath();
+      ctx.arc(s.x * W, s.y * H, s.r, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(' + s.c + ',' + a + ')';
+      ctx.fill();
+    }
+    requestAnimationFrame(drawStars);
+  }
+  function pause() {
+    running = document.visibilityState === 'visible';
+    if (running) requestAnimationFrame(drawStars);
+  }
+  document.addEventListener('visibilitychange', pause);
   requestAnimationFrame(drawStars);
-}
-drawStars();
+})();
 
 // ===== 网名生成器 =====
 function generateName() {
