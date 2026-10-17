@@ -3,13 +3,20 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="description" content="xkmyth 在线工具箱 —— 30 个纯前端工具：时间戳、Base64、URL、JSON、Markdown、正则、JWT、SHA 哈希、密码、UUID、颜色、进制、单位换算、贷款、BMI、日期差、时区、子网、CSV、表达式计算器，本地运算、离线可用、不上传任何数据。">
+<meta name="description" content="xkmyth 在线工具箱 —— 139 个纯前端工具：时间戳、Base64、URL、JSON、Markdown、正则、JWT、SHA 哈希、密码、UUID、颜色、进制、单位换算、贷款、BMI、日期差、时区、子网、CSV、表达式计算器，本地运算、离线可用、不上传任何数据。">
 <title>工具箱 · 139 个在线工具 · 星空全能工具站 · xkmyth</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='45' r='16' fill='%23fcd34d'/><path d='M50 20v50M25 45h50' stroke='%23fcd34d' stroke-width='6'/><ellipse cx='50' cy='66' rx='26' ry='8' stroke='%239ae3ff' stroke-width='3' fill='none' transform='rotate(-15 50 66)'/></svg>">
 <link rel="stylesheet" href="tools.css">
+
+<meta name="theme-color" content="#04060f" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f4f6fb" media="(prefers-color-scheme: light)">
+<link rel="manifest" href="/Timarsky/tools/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="64x64" href="/favicon.png"><meta name="color-scheme" content="dark light">
 </head>
 <body>
-<canvas id="sky"></canvas>
+<a class="skip-link" href="#main">跳到主内容</a>
+<canvas id="sky" aria-hidden="true"></canvas>
 
 <header class="header">
   <div class="logo"><a href="../">★ xkmyth</a> · 在线工具箱</div>
@@ -22,9 +29,9 @@
 </header>
 
 <section class="hero">
-  <p class="hero-eyebrow">TOOLKIT · 30 TOOLS · 纯前端 · 数据不出浏览器</p>
+  <p class="hero-eyebrow">TOOLKIT · 139 TOOLS · 纯前端 · 数据不出浏览器</p>
   <h1 class="hero-title">在<span class="gold">工具箱</span></h1>
-  <p class="hero-sub">30 个开箱即用的在线工具 · 输入即出结果 · 不上传任何数据</p>
+  <p class="hero-sub">139 个开箱即用的在线工具 · 输入即出结果 · 不上传任何数据</p>
   <div class="hero-live">
     <span class="live-dot"></span>
     <span id="liveClock">--:--:--</span>
@@ -63,7 +70,7 @@
 
 <p class="tnone" id="tnone" hidden>没有找到匹配的工具 —— 换个更短的关键词，或者点「全部」看完整列表。</p>
 
-<main class="tgrid" id="tgrid"></main>
+<main id="main" tabindex="-1" class="tgrid" id="tgrid"></main>
 
 <footer class="foot">
   <p>© <span id="year">2026</span> 星空神话 xkmyth · 工具箱 · 所有计算都在你的浏览器里完成</p>
@@ -77,5 +84,13 @@
 
 <div class="toast" id="toast"></div>
 <script src="tools.js"></script>
+<script>
+/* 工具站也注册全站 service worker：断网时仍可打开已缓存的工具页 */
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1') && !/[?&]nosw=1/.test(location.search)) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(function () {});
+  });
+}
+</script>
 </body>
 </html>

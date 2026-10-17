@@ -7,16 +7,22 @@
   <link rel="stylesheet" href="style.css">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✨</text></svg>">
   <title>星空全能工具站 · xkmyth 工具站</title>
-</head>
-<body>
 
-<canvas id="stars"></canvas>
+<meta name="theme-color" content="#04060f" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f4f6fb" media="(prefers-color-scheme: light)">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="64x64" href="/favicon.png"><meta name="color-scheme" content="dark light">
+</head>
+<body id="main" tabindex="-1">
+
+<a class="skip-link" href="#main">跳到主内容</a>
+<canvas id="stars" aria-hidden="true"></canvas>
 <div id="glow"></div>
 
 <div class="header">
   <div class="logo"><a href="https://xkmyth.github.io/" style="color:inherit;text-decoration:none">★ xkmyth</a> · 星空全能工具站</div>
   <div class="nav">
-    <a href="tools/">工具箱</a>
     <a href="tools/">工具箱</a>
     <a href="https://xkmyth.github.io/">主站</a>
     <a href="#m1">Windows</a>
@@ -2868,11 +2874,19 @@ transition:all 0.3s ease;box-shadow:0 4px 15px rgba(245,158,11,0.3)}
 document.getElementById('backToTop').classList.toggle('show',window.scrollY>300);});</script>
 
 <div class="footer">
-  <p>© <span id="year">2026</span> 星空神话 xkmyth · 星空全能工具站 · 收录 723 个实用工具与技巧</p>
+  <p>© <span id="year">2026</span> 星空神话 xkmyth · 星空全能工具站 · 27 个速查模块 · 139 个在线工具</p>
   <p style="margin-top:8px;font-size:12px">仅供学习交流 · 欢迎收藏使用 · <a href="https://xkmyth.github.io/about/" style="color:inherit">关于 xkmyth</a></p>
 </div>
 
 <script src="main.js"></script>
 <script src="script.js"></script>
+<script>
+/* 工具站也注册全站 service worker：断网时仍可打开已缓存的工具页 */
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1') && !/[?&]nosw=1/.test(location.search)) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(function () {});
+  });
+}
+</script>
 </body>
 </html>

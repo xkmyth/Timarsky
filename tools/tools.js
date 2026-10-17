@@ -5021,8 +5021,10 @@
   var grid = $('#tgrid');
   if (!grid) return;
   var chips = $('#chips');
+  var ONLY = document.documentElement.getAttribute('data-tool') || '';
 
   TOOLS.forEach(function (t, idx) {
+    if (ONLY && t.id !== ONLY) return;
     var card = el('article', 'tool reveal');
     card.setAttribute('data-cat', t.cat);
     card.id = 'tool-' + t.id;
