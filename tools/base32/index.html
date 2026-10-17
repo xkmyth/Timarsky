@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-tool="base32">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="RFC 4648 Base32，常用于密钥与一次性口令的书写格式 — 在线Base32 编解码，纯前端本地计算，数据不出浏览器。">
+<title>Base32 编解码 · 在线工具 · xkmyth</title>
+<link rel="canonical" href="https://xkmyth.github.io/Timarsky/tools/base32/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xkmyth">
+<meta property="og:title" content="Base32 编解码 · 在线工具">
+<meta property="og:description" content="RFC 4648 Base32，常用于密钥与一次性口令的书写格式">
+<meta property="og:url" content="https://xkmyth.github.io/Timarsky/tools/base32/">
+<meta name="twitter:card" content="summary">
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "SoftwareApplication", "name": "Base32 编解码", "description": "RFC 4648 Base32，常用于密钥与一次性口令的书写格式", "url": "https://xkmyth.github.io/Timarsky/tools/base32/", "applicationCategory": "UtilitiesApplication", "operatingSystem": "Web", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "CNY"}, "isPartOf": {"@type": "WebSite", "name": "xkmyth 在线工具箱", "url": "https://xkmyth.github.io/Timarsky/tools/"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "首页", "item": "https://xkmyth.github.io/"}, {"@type": "ListItem", "position": 2, "name": "在线工具箱", "item": "https://xkmyth.github.io/Timarsky/tools/"}, {"@type": "ListItem", "position": 3, "name": "Base32 编解码", "item": "https://xkmyth.github.io/Timarsky/tools/base32/"}]}]}</script>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='45' r='16' fill='%23fcd34d'/><path d='M50 20v50M25 45h50' stroke='%23fcd34d' stroke-width='6'/><ellipse cx='50' cy='66' rx='26' ry='8' stroke='%239ae3ff' stroke-width='3' fill='none' transform='rotate(-15 50 66)'/></svg>">
+<link rel="stylesheet" href="../tools.css">
+
+<meta name="theme-color" content="#04060f" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f4f6fb" media="(prefers-color-scheme: light)">
+<link rel="manifest" href="/Timarsky/tools/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="64x64" href="/favicon.png">
+<meta property="og:image" content="https://xkmyth.github.io/icons/og-1200x630.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image"><meta name="color-scheme" content="dark light">
+</head>
+<body>
+<a class="skip-link" href="#main">跳到主内容</a>
+<canvas id="sky" aria-hidden="true"></canvas>
+
+<header class="header">
+  <div class="logo"><a href="../../">★ xkmyth</a> · 在线工具箱</div>
+  <div class="nav">
+    <a href="../">全部工具</a>
+    <a href="../../">速查手册</a>
+    <a href="../../#m1">Windows</a>
+    <a href="https://xkmyth.github.io/">主站</a>
+  </div>
+</header>
+
+<main id="main" tabindex="-1" class="tp">
+  <nav class="tp-crumb" aria-label="面包屑">
+    <a href="https://xkmyth.github.io/">首页</a><span>›</span>
+    <a href="../">在线工具箱</a><span>›</span>
+    <a href="../#tool-base32">编码转换</a><span>›</span>
+    <span class="tp-cur">Base32 编解码</span>
+  </nav>
+
+  <div class="tp-head">
+    <div class="tp-head-main">
+      <p class="tp-eyebrow">🅱️ 编码转换 · enc</p>
+      <h1 class="tp-title">Base32 编解码</h1>
+      <p class="tp-lead">RFC 4648 Base32，常用于密钥与一次性口令的书写格式</p>
+    </div>
+    <div class="tp-actions">
+      <button class="t-btn" type="button" data-copy-page>复制本页链接</button>
+      <a class="t-btn ghost" href="../#tool-base32">在列表里看</a>
+    </div>
+  </div>
+
+  <div class="tp-grid">
+    <section class="tp-live">
+      <h2 class="tp-h2">就在这儿用</h2>
+      <p class="tp-live-note">下面这个就是真的工具本体，跟你去工具箱里点开的是同一个。</p>
+      <div class="tgrid" id="tgrid"></div>
+      <p class="tp-privacy">所有计算都在你的浏览器里完成 · 不联网 · 不上传 · 刷新即重置</p>
+    </section>
+
+    <aside class="tp-side">
+      <section class="tp-card">
+        <h2 class="tp-h2">什么时候用</h2>
+        <p>TOTP 密钥一般用 Base32 写，手抄容易看错。</p>
+      </section>
+      <section class="tp-card">
+        <h2 class="tp-h2">怎么用</h2>
+        <ol class="tp-steps"><li>把要处理的文本粘进输入框</li><li>选方向（编码 / 解码）或填好参数</li><li>点按钮或直接输入，结果可一键复制</li></ol>
+      </section>
+      <section class="tp-card">
+        <h2 class="tp-h2">长得什么样</h2>
+        <pre class="tp-ex">JBSWY3DP → Hello</pre>
+      </section>
+      <section class="tp-card tp-card-tip">
+        <h2 class="tp-h2">注意</h2>
+        <p>Base32 字符集不含 0、1、8、9，抄错通常错在这几个字符。</p>
+      </section>
+      <section class="tp-card">
+        <h2 class="tp-h2">同类工具</h2>
+        <ul class="tp-rel">          <li><a href="../b64/">🔐 Base64 编解码</a></li>
+          <li><a href="../url/">🔗 URL 编解码</a></li>
+          <li><a href="../json/">🧾 JSON 美化 / 校验</a></li>
+          <li><a href="../unicode/">🔣 字符编码查询</a></li>
+          <li><a href="../csv/">📊 CSV ↔ JSON</a></li>
+          <li><a href="../rot13/">🔄 ROT13 / 凯撒位移</a></li></ul>
+      </section>
+    </aside>
+  </div>
+
+  <nav class="tp-pager" aria-label="上下一个工具">
+    <a class="tp-prev" href="../csv/">← 📊 CSV ↔ JSON</a>
+    <a class="tp-next" href="../rot13/">🔄 ROT13 / 凯撒位移 →</a>
+  </nav>
+</main>
+
+<footer class="foot">
+  <p>© <span id="year">2026</span> 星空神话 xkmyth · 工具详情 · 所有计算都在你的浏览器里完成</p>
+  <p class="foot-links">
+    <a href="../">全部工具</a> ·
+    <a href="../../">速查手册</a> ·
+    <a href="https://xkmyth.github.io/">主站</a> ·
+    <a href="https://xkmyth.github.io/xkmyth/">Downloads</a> ·
+    <a href="https://xkmyth.github.io/support/">反馈</a>
+  </p>
+</footer>
+
+<div class="toast" id="toast"></div>
+<script src="../tools.js"></script>
+<script>
+(function () {
+  function tip(msg) {
+    var t = document.getElementById('toast');
+    if (!t) return;
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(function () { t.classList.remove('show'); }, 1600);
+  }
+  var y = document.getElementById('year');
+  if (y) y.textContent = String(new Date().getFullYear());
+  var btn = document.querySelector('[data-copy-page]');
+  if (btn) btn.addEventListener('click', function () {
+    var url = location.href;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(function () { tip('链接已复制'); },
+        function () { window.prompt('复制这个链接：', url); });
+    } else {
+      window.prompt('复制这个链接：', url);
+    }
+  });
+})();
+</script>
+<script>
+/* 工具站也注册全站 service worker：断网时仍可打开已缓存的工具页 */
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1') && !/[?&]nosw=1/.test(location.search)) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(function () {});
+  });
+}
+</script>
+</body>
+</html>
