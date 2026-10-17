@@ -5994,4 +5994,121 @@
     }
   })();
 
+
+  /* ---------------- 快速跳转（/ 或 Ctrl+K 搜 160 个工具名） ---------------- */
+  (function quickjump() {
+    if (!TOOLS.length) return;
+    /* 目录页自己带搜索框，这里只管详情页 */
+    if (document.getElementById('tsearch')) return;
+    var box = null, input = null, listEl = null, sel = 0, view = [];
+    var btn = null;
+
+    function open() {
+      if (box) { input.focus(); input.select(); return; }
+      box = el('div', 'qj-scrim');
+      var panel = el('div', 'qj-box');
+      panel.setAttribute('role', 'dialog');
+      panel.setAttribute('aria-modal', 'true');
+      panel.setAttribute('aria-label', '跳转到工具');
+      input = el('input', 'qj-input');
+      input.type = 'text';
+      input.placeholder = '搜工具名、分类或英文 id…';
+      input.setAttribute('aria-label', '搜索工具');
+      listEl = el('div', 'qj-list');
+      listEl.setAttribute('role', 'listbox');
+      var foot = el('div', 'qj-foot');
+      foot.innerHTML = '<span>↑↓ 选择</span><span>Enter 打开</span><span>Esc 关闭</span>';
+      panel.appendChild(input);
+      panel.appendChild(listEl);
+      panel.appendChild(foot);
+      box.appendChild(panel);
+      box.addEventListener('click', function (e) { if (e.target === box) close(); });
+      document.body.appendChild(box);
+      input.addEventListener('input', function () { render(input.value); });
+      input.addEventListener('keydown', onKey);
+      render('');
+      input.focus();
+    }
+
+    function close() {
+      if (!box) return;
+      box.parentNode.removeChild(box);
+      box = input = listEl = null;
+      view = [];
+    }
+
+    function render(q) {
+      q = (q || '').toLowerCase().trim();
+      var rows = [];
+      for (var i = 0; i < TOOLS.length; i++) {
+        var t = TOOLS[i];
+        var hay = (t.name + ' ' + t.desc + ' ' + t.id + ' ' + t.cat).toLowerCase();
+        var s = 0;
+        if (!q) s = 1;
+        else if (t.name.toLowerCase().indexOf(q) === 0) s = 90;
+        else if (t.name.toLowerCase().indexOf(q) > -1) s = 70;
+        else if (hay.indexOf(q) > -1) s = 45;
+        if (s) rows.push({ t: t, s: s });
+      }
+      rows.sort(function (a, b) { return b.s - a.s; });
+      view = rows.slice(0, 12);
+      sel = 0;
+      listEl.innerHTML = '';
+      if (!view.length) {
+        listEl.appendChild(el('div', 'qj-empty', '没找到，换个说法试试'));
+        return;
+      }
+      for (var j = 0; j < view.length; j++) {
+        (function (item, idx) {
+          var row = el('a', 'qj-item');
+          row.href = '/Timarsky/tools/' + item.t.id + '/';
+          row.setAttribute('role', 'option');
+          row.innerHTML = '<span class="qj-ico">' + (item.t.icon || '•') + '</span>' +
+            '<span class="qj-name">' + escHtml(item.t.name) + '</span>' +
+            '<span class="qj-cat">' + escHtml(item.t.cat) + '</span>';
+          if (idx === sel) row.setAttribute('aria-selected', 'true');
+          row.addEventListener('mouseenter', function () { setSel(idx); });
+          listEl.appendChild(row);
+        })(view[j], j);
+      }
+    }
+
+    function setSel(i) {
+      if (!view.length) return;
+      var rows = listEl.querySelectorAll('.qj-item');
+      if (rows[sel]) rows[sel].removeAttribute('aria-selected');
+      sel = (i + view.length) % view.length;
+      if (rows[sel]) rows[sel].setAttribute('aria-selected', 'true');
+    }
+
+    function onKey(e) {
+      if (e.key === 'ArrowDown') { e.preventDefault(); setSel(sel + 1); }
+      else if (e.key === 'ArrowUp') { e.preventDefault(); setSel(sel - 1); }
+      else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (view[sel]) location.href = '/Timarsky/tools/' + view[sel].t.id + '/';
+      } else if (e.key === 'Escape') { e.preventDefault(); close(); }
+    }
+
+    document.addEventListener('keydown', function (e) {
+      var typing = /^(INPUT|TEXTAREA|SELECT)$/.test((e.target.tagName || ''));
+      if ((e.key === 'k' || e.key === 'K') && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault(); open(); return;
+      }
+      if (e.key === '/' && !typing && !box) { e.preventDefault(); open(); }
+      if (e.key === 'Escape' && box) { e.preventDefault(); close(); }
+    });
+
+    var host = document.querySelector('.header .nav') || document.querySelector('.tp-actions');
+    if (host) {
+      btn = el('button', 'theme-btn qj-btn');
+      btn.type = 'button';
+      btn.textContent = '⌕';
+      btn.title = '搜索工具（/）';
+      btn.setAttribute('aria-label', '搜索工具');
+      btn.addEventListener('click', open);
+      host.appendChild(btn);
+    }
+  })();
+
 })();
