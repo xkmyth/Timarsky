@@ -17,52 +17,105 @@ function copyContent(id) {
   }).catch(() => alert('复制失败，请手动复制'));
 }
 
-// ===== 搜索框（类名样式化，见 style.css）=====
+// ===== 搜索（自绘控件：图标 / 快捷键 / 计数 / 空状态 / 键盘操作）=====
+let searchTimer = null;
+
 function initSearch() {
-  const searchBox = document.createElement('div');
-  searchBox.innerHTML = `
-    <div class="search-wrap">
-      <input type="text" id="searchInput" placeholder="🔍 搜索工具... 例如：Ctrl+C、CAD、Word...">
-      <span id="searchCount" class="search-count"></span>
-    </div>`;
-
+  if (document.querySelector('.qs-bar')) return;
+  const bar = document.createElement('div');
+  bar.className = 'qs-bar';
+  bar.innerHTML = [
+    '<div class="qs-box">',
+    '  <span class="qs-ico" aria-hidden="true">⌕</span>',
+    '  <input type="search" id="searchInput" class="qs-input" autocomplete="off" spellcheck="false"',
+    '         placeholder="搜模块与工具：Ctrl+C · CAD · Word · PowerShell · 哈希" aria-label="搜索模块与工具">',
+    '  <button type="button" class="qs-clear" id="qsClear" aria-label="清空搜索" hidden>×</button>',
+    '  <kbd class="qs-kbd" aria-hidden="true">/</kbd>',
+    '</div>',
+    '<div class="qs-meta">',
+    '  <span id="searchCount" class="qs-count"></span>',
+    '  <span class="qs-hint"><kbd>/</kbd> 聚焦 · <kbd>Esc</kbd> 清空 · <kbd>Enter</kbd> 展开首个结果</span>',
+    '</div>',
+    '<div class="qs-empty" id="qsEmpty" hidden>',
+    '  <b>没有找到匹配内容</b>',
+    '  <span>换个更短的关键词，或者点下面的模块速览直接跳转。</span>',
+    '</div>'
+  ].join('\n');
   const banner = document.querySelector('.banner');
-  if (banner) banner.after(searchBox);
+  (banner || document.body).after(bar);
 
-  document.getElementById('searchInput').addEventListener('input', function() {
+  const input = document.getElementById('searchInput');
+  const clearBtn = document.getElementById('qsClear');
+  if (!input) return;
+
+  input.addEventListener('input', function () {
     clearTimeout(searchTimer);
-    searchTimer = setTimeout(() => searchTools(this.value), 200);
+    const v = this.value;
+    if (clearBtn) clearBtn.hidden = !v;
+    searchTimer = setTimeout(function () { searchTools(v); }, 160);
+  });
+
+  input.addEventListener('keydown', function (ev) {
+    if (ev.key === 'Escape') { ev.preventDefault(); clearSearch(); return; }
+    if (ev.key === 'Enter') {
+      const first = document.querySelector('.tool-card:not(.qs-hide)');
+      if (!first) return;
+      ev.preventDefault();
+      const btn = first.querySelector('button[onclick^="toggle("]') || first.querySelector('button');
+      if (btn) btn.click();
+      first.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      first.classList.add('qs-hit');
+      setTimeout(function () { first.classList.remove('qs-hit'); }, 1400);
+    }
+  });
+
+  if (clearBtn) clearBtn.addEventListener('click', clearSearch);
+
+  document.addEventListener('keydown', function (ev) {
+    const tag = (document.activeElement && document.activeElement.tagName) || '';
+    if (ev.key === '/' && tag !== 'INPUT' && tag !== 'TEXTAREA') {
+      ev.preventDefault();
+      input.focus();
+      input.select();
+    }
   });
 }
 
-let searchTimer = null;
+function clearSearch() {
+  const input = document.getElementById('searchInput');
+  const clearBtn = document.getElementById('qsClear');
+  if (input) input.value = '';
+  if (clearBtn) clearBtn.hidden = true;
+  searchTools('');
+  if (input) input.focus();
+}
+
 function searchTools(q) {
+  q = String(q || '').toLowerCase().trim();
   const cards = document.querySelectorAll('.tool-card');
   const modules = document.querySelectorAll('.module');
   const count = document.getElementById('searchCount');
-  q = q.toLowerCase().trim();
-
-  if (!q) {
-    cards.forEach(c => { c.style.display = ''; });
-    modules.forEach(m => { m.style.display = ''; });
-    if (count) count.innerText = '';
-    return;
-  }
-
+  const empty = document.getElementById('qsEmpty');
   let visible = 0;
-  cards.forEach(c => {
-    const text = c.innerText.toLowerCase();
-    const match = text.includes(q);
-    c.style.display = match ? '' : 'none';
-    if (match) visible++;
+
+  cards.forEach(function (c) {
+    const hit = !q || c.textContent.toLowerCase().indexOf(q) >= 0;
+    c.classList.toggle('qs-hide', !hit);
+    if (hit) visible++;
   });
 
-  modules.forEach(m => {
-    const hasVisible = [...m.querySelectorAll('.tool-card')].some(c => c.style.display !== 'none');
-    m.style.display = hasVisible ? '' : 'none';
+  modules.forEach(function (m) {
+    const any = Array.prototype.some.call(m.querySelectorAll('.tool-card'), function (c) {
+      return !c.classList.contains('qs-hide');
+    });
+    m.classList.toggle('qs-hide', !any);
   });
 
-  if (count) count.innerText = visible > 0 ? `${visible} 个结果` : '无结果';
+  if (count) count.textContent = q ? (visible ? visible + ' 个结果' : '无结果') : '';
+  if (empty) empty.hidden = !q || visible > 0;
+  if (q) {
+    document.querySelectorAll('.tool-content').forEach(function (el) { el.style.display = 'none'; });
+  }
 }
 
 // ===== 模块速览 chips（自动从所有模块标题生成）=====
@@ -80,7 +133,7 @@ function buildChips() {
     a.textContent = h.textContent.replace(/（\d+个?）/, '').trim();
     bar.appendChild(a);
   });
-  const search = document.querySelector('.search-wrap');
+  const search = document.querySelector('.qs-bar');
   if (search) search.after(bar);
 }
 

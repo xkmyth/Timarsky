@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<meta name="description" content="xkmyth 在线工具箱 —— 时间戳、Base64、URL、JSON、文本统计、SHA-256、密码生成、UUID、颜色、进制、命名风格，纯前端离线可用，全部带动效。">
-<title>工具箱 · 星空全能工具站 · xkmyth</title>
+<meta name="description" content="xkmyth 在线工具箱 —— 30 个纯前端工具：时间戳、Base64、URL、JSON、Markdown、正则、JWT、SHA 哈希、密码、UUID、颜色、进制、单位换算、贷款、BMI、日期差、时区、子网、CSV、表达式计算器，本地运算、离线可用、不上传任何数据。">
+<title>工具箱 · 30 个在线工具 · 星空全能工具站 · xkmyth</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='45' r='16' fill='%23fcd34d'/><path d='M50 20v50M25 45h50' stroke='%23fcd34d' stroke-width='6'/><ellipse cx='50' cy='66' rx='26' ry='8' stroke='%239ae3ff' stroke-width='3' fill='none' transform='rotate(-15 50 66)'/></svg>">
 <link rel="stylesheet" href="tools.css">
 </head>
@@ -22,9 +22,9 @@
 </header>
 
 <section class="hero">
-  <p class="hero-eyebrow">TOOLKIT · 纯前端 · 数据不出浏览器</p>
+  <p class="hero-eyebrow">TOOLKIT · 30 TOOLS · 纯前端 · 数据不出浏览器</p>
   <h1 class="hero-title">在<span class="gold">工具箱</span></h1>
-  <p class="hero-sub">11 个开箱即用的在线工具 · 输入即出结果 · 不上传任何数据</p>
+  <p class="hero-sub">30 个开箱即用的在线工具 · 输入即出结果 · 不上传任何数据</p>
   <div class="hero-live">
     <span class="live-dot"></span>
     <span id="liveClock">--:--:--</span>
@@ -35,14 +35,33 @@
   </div>
 </section>
 
-<nav class="chips" id="chips" aria-label="工具分类">
-  <button class="chip active" data-cat="all">全部</button>
-  <button class="chip" data-cat="enc">编码转换</button>
-  <button class="chip" data-cat="text">文本处理</button>
-  <button class="chip" data-cat="time">时间日期</button>
-  <button class="chip" data-cat="safe">安全随机</button>
-  <button class="chip" data-cat="num">数值颜色</button>
-</nav>
+<div class="toolbar">
+  <div class="tsearch">
+    <span class="tsearch-ico" aria-hidden="true">⌕</span>
+    <input id="tsearch" type="search" placeholder="搜索工具：哈希 / json / 时间戳 / 子网 / 贷款…" autocomplete="off" spellcheck="false" aria-label="搜索工具">
+    <button class="tsearch-clear" id="tsearchClear" type="button" aria-label="清空搜索" hidden>×</button>
+    <kbd class="tsearch-kbd" aria-hidden="true">/</kbd>
+  </div>
+
+  <nav class="chips" id="chips" aria-label="工具分类">
+    <button class="chip active" data-cat="all">全部</button>
+    <button class="chip" data-cat="enc">编码转换</button>
+    <button class="chip" data-cat="text">文本处理</button>
+    <button class="chip" data-cat="time">时间日期</button>
+    <button class="chip" data-cat="safe">安全随机</button>
+    <button class="chip" data-cat="num">数值颜色</button>
+    <button class="chip" data-cat="dev">开发调试</button>
+    <button class="chip" data-cat="calc">计算换算</button>
+    <button class="chip" data-cat="net">网络</button>
+    <button class="chip" data-cat="file">文件数据</button>
+  </nav>
+
+  <p class="tsearch-meta">
+    <span id="tcount">30 个工具</span> · 按 <kbd>/</kbd> 聚焦搜索 · <kbd>Esc</kbd> 清空 · <kbd>Enter</kbd> 跳到首个结果
+  </p>
+</div>
+
+<p class="tnone" id="tnone" hidden>没有找到匹配的工具 —— 换个更短的关键词，或者点「全部」看完整列表。</p>
 
 <main class="tgrid" id="tgrid"></main>
 
