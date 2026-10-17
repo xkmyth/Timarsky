@@ -57,7 +57,11 @@
     return btoa(bin);
   }
   function b64decode(str) {
-    var clean = str.replace(/\s+/g, '');
+    var clean = str.replace(/\s+/g, '').replace(/-/g, '+').replace(/_/g, '/');
+    var extra = clean.length % 4;
+    if (extra === 2) clean += '==';
+    else if (extra === 3) clean += '=';
+    else if (extra === 1) throw new Error('Base64 长度不合法');
     var bin = atob(clean);
     var bytes = new Uint8Array(bin.length);
     for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
@@ -241,20 +245,22 @@
           return { ok: false, msg: msg + extra };
         }
       }
+      var lastClean = '';   // 复制时只复制纯 JSON，不带统计文字
       $('#jsonPretty', card).addEventListener('click', function () {
         var r = parse();
         if (!r.ok) { out.className = 'out err'; out.textContent = '✗ ' + r.msg; return; }
-        out.className = 'out'; out.textContent = JSON.stringify(r.data, null, 2); flash(out);
+        lastClean = JSON.stringify(r.data, null, 2);
+        out.className = 'out'; out.textContent = lastClean; flash(out);
       });
       $('#jsonMin', card).addEventListener('click', function () {
         var r = parse();
         if (!r.ok) { out.className = 'out err'; out.textContent = '✗ ' + r.msg; return; }
-        var s = JSON.stringify(r.data);
+        lastClean = JSON.stringify(r.data);
         out.className = 'out';
-        out.textContent = '✓ 合法 JSON · ' + input.value.length + ' 字符 → ' + s.length + ' 字符\n\n' + s;
+        out.textContent = '✓ 合法 JSON · ' + input.value.length + ' 字符 → ' + lastClean.length + ' 字符\n\n' + lastClean;
         flash(out);
       });
-      $('#jsonCopy', card).addEventListener('click', function () { copyText(out.textContent); });
+      $('#jsonCopy', card).addEventListener('click', function () { copyText(lastClean || ''); });
     }
   });
 
@@ -449,20 +455,23 @@
         }
         if (!pool) { out.className = 'out err'; out.textContent = '至少选一种字符集'; return; }
 
-        var n = Number(len.value);
-        var rnd = new Uint32Array(n);
+        if (!(window.crypto && crypto.getRandomValues)) {
+          out.className = 'out err';
+          out.textContent = '当前环境不支持安全随机数（需要 https 或 localhost）';
+          return;
+        }
+        var n = Math.max(1, Number(len.value) || 12);
+        var rnd = new Uint32Array(64);
+        function rndAt(i) { if (i >= 64) crypto.getRandomValues(rnd); return rnd[i % 64]; }
         crypto.getRandomValues(rnd);
         var chars = [];
-        for (var i = 0; i < n; i++) chars.push(pool[rnd[i] % pool.length]);
-        // 保证每类至少出现一次
-        mandatory.forEach(function (set, idx) {
-          if (!chars.some(function (c) { return set.indexOf(c) !== -1; }) && idx < n) {
-            chars[idx] = set[rnd[idx] % set.length];
-          }
+        // 每类先各占一个位置，再随机补齐，最后洗牌 —— 避免覆盖别的类的唯一样本
+        mandatory.slice(0, n).forEach(function (set) {
+          if (set) chars.push(set[rndAt(chars.length) % set.length]);
         });
-        // 洗牌
+        while (chars.length < n) chars.push(pool[rndAt(chars.length) % pool.length]);
         for (var j = chars.length - 1; j > 0; j--) {
-          var k = rnd[j] % (j + 1);
+          var k = rndAt(j) % (j + 1);
           var tmp = chars[j]; chars[j] = chars[k]; chars[k] = tmp;
         }
         var pwd = chars.join('');
@@ -499,7 +508,8 @@
       var out = $('#uuidOut', card), nSel = $('#uuidN', card);
 
       function uuid() {
-        if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+        if (!(window.crypto && (crypto.randomUUID || crypto.getRandomValues))) return '';
+        if (crypto.randomUUID) return crypto.randomUUID();
         var b = new Uint8Array(16);
         crypto.getRandomValues(b);
         b[6] = (b[6] & 0x0f) | 0x40;
@@ -508,6 +518,11 @@
         return h.slice(0, 8) + '-' + h.slice(8, 12) + '-' + h.slice(12, 16) + '-' + h.slice(16, 20) + '-' + h.slice(20);
       }
       function run() {
+        if (!(window.crypto && (crypto.randomUUID || crypto.getRandomValues))) {
+          out.className = 'out err';
+          out.textContent = '当前环境不支持安全随机数（需要 https 或 localhost）';
+          return;
+        }
         var n = Number(nSel.value), list = [];
         for (var i = 0; i < n; i++) list.push(uuid());
         out.className = 'out';
@@ -516,7 +531,7 @@
       }
       $('#uuidRun', card).addEventListener('click', run);
       $('#uuidCopy', card).addEventListener('click', function () { copyText(out.textContent); });
-      run();
+      try { run(); } catch (e) { out.className = 'out err'; out.textContent = '生成失败：' + e.message; }
     }
   });
 
@@ -558,14 +573,14 @@
         }
         return { h: Math.round(h), s: Math.round(s * 100), l: Math.round(l * 100) };
       }
-      function render(hex) {
+      function render(hex, writeBack) {
         var rgb = hexToRgb(hex);
-        if (!rgb) { out.className = 'out err'; out.textContent = '不是合法的 HEX 颜色'; return; }
+        if (!rgb) { out.className = 'out err'; out.textContent = '不是合法的 HEX 颜色（支持 3 位或 6 位）'; return; }
         var hsl = rgbToHsl(rgb);
         var norm = '#' + [rgb.r, rgb.g, rgb.b].map(function (v) { return v.toString(16).padStart(2, '0'); }).join('');
         swatch.style.background = norm;
         picker.value = norm;
-        hexIn.value = norm;
+        if (writeBack !== false) hexIn.value = norm;
         out.className = 'out';
         out.innerHTML =
           '<div class="kvline"><span>HEX</span><b>' + norm.toUpperCase() + '</b></div>' +
@@ -575,8 +590,11 @@
         flash(out);
       }
       hexIn.addEventListener('input', function () {
-        if (/^#?[0-9a-fA-F]{3}$|^#?[0-9a-fA-F]{6}$/.test(hexIn.value.trim())) render(hexIn.value);
+        var v = hexIn.value.trim();
+        if (/^#?[0-9a-fA-F]{6}$/.test(v)) render(v);
+        else if (/^#?[0-9a-fA-F]{3}$/.test(v)) render(v, false);   // 3 位只预览，不回写输入框
       });
+      hexIn.addEventListener('blur', function () { if (hexIn.value.trim()) render(hexIn.value); });
       picker.addEventListener('input', function () { render(picker.value); });
       $('#colorRand', card).addEventListener('click', function () {
         var h = '#' + Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, '0');
@@ -601,22 +619,31 @@
       card.appendChild(body);
       var input = $('#radixIn', card), base = $('#radixBase', card), out = $('#radixOut', card);
 
+      var RE = { 2: /^-?[01]+$/, 8: /^-?[0-7]+$/, 10: /^-?\d+$/, 16: /^-?[0-9a-fA-F]+$/ };
+
       function render() {
         var raw = input.value.trim();
         var b = Number(base.value);
-        var n = parseInt(raw, b);
-        if (!raw || isNaN(n) || !Number.isFinite(n)) {
-          out.className = 'out err'; out.textContent = '这不是合法的 ' + b + ' 进制数';
+        out.className = 'out';
+        if (!raw) { out.className = 'out err'; out.textContent = '请输入一个 ' + b + ' 进制整数'; return; }
+        if (!RE[b].test(raw)) {
+          out.className = 'out err';
+          out.textContent = '这不是合法的 ' + b + ' 进制整数（不要小数点、指数或前后缀）';
           return;
         }
-        out.className = 'out';
+        var n = parseInt(raw, b);
+        if (!Number.isSafeInteger(n)) {
+          out.className = 'out err'; out.textContent = '超出安全整数范围（±2^53），结果不可靠';
+          return;
+        }
+        var bytes = Math.ceil(Math.max(1, Math.abs(n)).toString(2).length / 8);
         out.innerHTML =
           '<div class="kvline"><span>十进制</span><b>' + n + '</b></div>' +
           '<div class="kvline"><span>二进制</span><b>' + n.toString(2) + '</b></div>' +
           '<div class="kvline"><span>八进制</span><b>' + n.toString(8) + '</b></div>' +
           '<div class="kvline"><span>十六进制</span><b>' + n.toString(16).toUpperCase() + '</b></div>' +
-          '<div class="kvline"><span>字节数</span><b>' + Math.ceil(Math.max(1, Math.abs(n)).toString(2).length / 8) + ' B</b></div>' +
-          '<div class="kvline"><span>UTF-8 体积</span><b>' + (String(raw).length <= 0 ? 0 : new TextEncoder().encode(String(n)).length) + ' B</b></div>';
+          '<div class="kvline"><span>数值占位</span><b>' + bytes + ' B</b></div>' +
+          '<div class="kvline"><span>输入文本</span><b>' + raw.length + ' 字符 / ' + new TextEncoder().encode(raw).length + ' B（UTF-8）</b></div>';
         flash(out);
       }
       input.addEventListener('input', render);
@@ -627,6 +654,7 @@
 
   /* ---------------- 渲染 ---------------- */
   var grid = $('#tgrid');
+  if (!grid) return;
   var chips = $('#chips');
 
   TOOLS.forEach(function (t, idx) {
