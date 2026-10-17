@@ -141,4 +141,25 @@
   <url><loc>https://xkmyth.github.io/Timarsky/tools/outline/</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>https://xkmyth.github.io/Timarsky/tools/tts/</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>https://xkmyth.github.io/Timarsky/tools/vlsm/</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://xkmyth.github.io/Timarsky/tools/aesgcm/</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://xkmyth.github.io/Timarsky/tools/jwtgen/</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://xkmyth.github.io/Timarsky/tools/otpauth/</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://xkmyth.github.io/Timarsky/tools/pwhash/</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://xkmyth.github.io/Timarsky/tools/agecalc/</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://xkmyth.github.io/Timarsky/tools/workdays/</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://xkmyth.github.io/Timarsky/tools/countdown/</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://xkmyth.github.io/Timarsky/tools/ipv6cidr/</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://xkmyth.github.io/Timarsky/tools/wol/</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://xkmyth.github.io/Timarsky/tools/urltemplate/</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://xkmyth.github.io/Timarsky/tools/bitshift/</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://xkmyth.github.io/Timarsky/tools/bytesize/</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://xkmyth.github.io/Timarsky/tools/percentile/</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://xkmyth.github.io/Timarsky/tools/gitignore/</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://xkmyth.github.io/Timarsky/tools/envjson/</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://xkmyth.github.io/Timarsky/tools/sqlinsert/</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://xkmyth.github.io/Timarsky/tools/magic/</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://xkmyth.github.io/Timarsky/tools/b64file/</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://xkmyth.github.io/Timarsky/tools/textfile/</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://xkmyth.github.io/Timarsky/tools/nato/</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://xkmyth.github.io/Timarsky/tools/spellout/</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
 </urlset>

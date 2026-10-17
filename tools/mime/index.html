@@ -5,30 +5,19 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="description" content="按扩展名查 MIME，或反查常见扩展名 — 在线MIME 类型速查，纯前端本地计算，数据不出浏览器。">
 <title>MIME 类型速查 · 在线工具 · xkmyth</title>
+<link rel="canonical" href="https://xkmyth.github.io/Timarsky/tools/mime/">
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="xkmyth">
 <meta property="og:title" content="MIME 类型速查 · 在线工具">
 <meta property="og:description" content="按扩展名查 MIME，或反查常见扩展名">
 <meta property="og:url" content="https://xkmyth.github.io/Timarsky/tools/mime/">
 <meta name="twitter:card" content="summary">
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "SoftwareApplication", "name": "MIME 类型速查", "description": "按扩展名查 MIME，或反查常见扩展名", "url": "https://xkmyth.github.io/Timarsky/tools/mime/", "applicationCategory": "UtilitiesApplication", "operatingSystem": "Web", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "CNY"}, "isPartOf": {"@type": "WebSite", "name": "xkmyth 在线工具箱", "url": "https://xkmyth.github.io/Timarsky/tools/"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "首页", "item": "https://xkmyth.github.io/"}, {"@type": "ListItem", "position": 2, "name": "在线工具箱", "item": "https://xkmyth.github.io/Timarsky/tools/"}, {"@type": "ListItem", "position": 3, "name": "MIME 类型速查", "item": "https://xkmyth.github.io/Timarsky/tools/mime/"}]}]}</script>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='45' r='16' fill='%23fcd34d'/><path d='M50 20v50M25 45h50' stroke='%23fcd34d' stroke-width='6'/><ellipse cx='50' cy='66' rx='26' ry='8' stroke='%239ae3ff' stroke-width='3' fill='none' transform='rotate(-15 50 66)'/></svg>">
 <link rel="stylesheet" href="../tools.css">
-
-<meta name="theme-color" content="#04060f" media="(prefers-color-scheme: dark)">
-<meta name="theme-color" content="#f4f6fb" media="(prefers-color-scheme: light)">
-<link rel="manifest" href="/Timarsky/tools/manifest.webmanifest">
-<link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<link rel="icon" type="image/png" sizes="64x64" href="/favicon.png">
-<meta property="og:image" content="https://xkmyth.github.io/icons/og-1200x630.png">
-<meta property="og:image:width" content="1200">
-<meta property="og:image:height" content="630">
-<meta name="twitter:card" content="summary_large_image"><meta name="color-scheme" content="dark light">
-<link rel="canonical" href="https://xkmyth.github.io/Timarsky/tools/mime/">
-<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"首页","item":"https://xkmyth.github.io/"},{"@type":"ListItem","position":2,"name":"工具站","item":"https://xkmyth.github.io/Timarsky/"},{"@type":"ListItem","position":3,"name":"tools","item":"https://xkmyth.github.io/Timarsky/tools/"},{"@type":"ListItem","position":4,"name":"MIME 类型速查","item":"https://xkmyth.github.io/Timarsky/tools/mime/"}]},{"@type":"SoftwareApplication","name":"MIME 类型速查","url":"https://xkmyth.github.io/Timarsky/tools/mime/","applicationCategory":"UtilitiesApplication","operatingSystem":"Any (浏览器)","browserRequirements":"需要 JavaScript","description":"按扩展名查 MIME，或反查常见扩展名 — 在线MIME 类型速查，纯前端本地计算，数据不出浏览器。","isPartOf":{"@type":"WebSite","name":"星空全能工具站","url":"https://xkmyth.github.io/Timarsky/"},"offers":{"@type":"Offer","price":"0","priceCurrency":"CNY"}}]}</script>
 </head>
 <body>
-<a class="skip-link" href="#main">跳到主内容</a>
-<canvas id="sky" aria-hidden="true"></canvas>
+<canvas id="sky"></canvas>
 
 <header class="header">
   <div class="logo"><a href="../../">★ xkmyth</a> · 在线工具箱</div>
@@ -40,7 +29,7 @@
   </div>
 </header>
 
-<main id="main" tabindex="-1" class="tp">
+<main class="tp">
   <nav class="tp-crumb" aria-label="面包屑">
     <a href="https://xkmyth.github.io/">首页</a><span>›</span>
     <a href="../">在线工具箱</a><span>›</span>
@@ -118,34 +107,20 @@
 <script src="../tools.js"></script>
 <script>
 (function () {
-  function tip(msg) {
-    var t = document.getElementById('toast');
-    if (!t) return;
-    t.textContent = msg;
-    t.classList.add('show');
-    setTimeout(function () { t.classList.remove('show'); }, 1600);
-  }
   var y = document.getElementById('year');
   if (y) y.textContent = String(new Date().getFullYear());
   var btn = document.querySelector('[data-copy-page]');
   if (btn) btn.addEventListener('click', function () {
     var url = location.href;
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(url).then(function () { tip('链接已复制'); },
-        function () { window.prompt('复制这个链接：', url); });
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(url).then(function () {
+        if (window.toast) window.toast('链接已复制');
+      }, function () { window.prompt('复制这个链接：', url); });
     } else {
       window.prompt('复制这个链接：', url);
     }
   });
 })();
-</script>
-<script>
-/* 工具站也注册全站 service worker：断网时仍可打开已缓存的工具页 */
-if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1') && !/[?&]nosw=1/.test(location.search)) {
-  window.addEventListener('load', function () {
-    navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(function () {});
-  });
-}
 </script>
 </body>
 </html>

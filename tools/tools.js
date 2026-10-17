@@ -5017,6 +5017,764 @@
     }
   });
 
+/* ==== 第三批工具（batch3）：安全 / 时间 / 网络 / 数字 / 开发 / 文件 ==== */
+  /* ---- safe ---- */
+
+  /* AES-GCM 文本加解密（密码派生 PBKDF2-SHA256） */
+  (function () {
+    var B64 = function (buf) {
+      var b = new Uint8Array(buf), s = '';
+      for (var i = 0; i < b.length; i++) s += String.fromCharCode(b[i]);
+      return btoa(s);
+    };
+    var UNB64 = function (str) {
+      var s = atob(String(str).trim()), out = new Uint8Array(s.length);
+      for (var i = 0; i < s.length; i++) out[i] = s.charCodeAt(i);
+      return out;
+    };
+    function need() {
+      if (!(window.crypto && window.crypto.subtle)) throw new Error('当前环境不支持 WebCrypto（需要 https 或 localhost）');
+    }
+    function derive(pass, salt) {
+      var enc = new TextEncoder();
+      return window.crypto.subtle.importKey('raw', enc.encode(pass), 'PBKDF2', false, ['deriveKey'])
+        .then(function (base) {
+          return window.crypto.subtle.deriveKey(
+            { name: 'PBKDF2', salt: salt, iterations: 150000, hash: 'SHA-256' },
+            base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+        });
+    }
+    t2form({
+      id: 'aesgcm', cat: 'safe', icon: '🔒', name: 'AES-GCM 文本加密',
+      desc: '用密码加密一段文本，输出可粘贴的 base64；解密同一串能还原',
+      btn: '加密',
+      fields: [
+        { id: 'mode', label: '方向', type: 'select', options: [['enc', '加密'], ['dec', '解密']], value: 'enc' },
+        { id: 'text', label: '文本 / 密文', type: 'text', ph: '要加密的文本，或要解密的密文' },
+        { id: 'pass', label: '密码', type: 'text', ph: '至少 6 位' }
+      ],
+      compute: function (v) {
+        need();
+        if (!v.pass || v.pass.length < 6) throw new Error('密码至少 6 位');
+        if (!v.text.trim()) throw new Error('先填内容');
+        var enc = new TextEncoder();
+        if (v.mode === 'enc') {
+          var salt = window.crypto.getRandomValues(new Uint8Array(16));
+          var iv = window.crypto.getRandomValues(new Uint8Array(12));
+          return derive(v.pass, salt).then(function (key) {
+            return window.crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, key, enc.encode(v.text));
+          }).then(function (ct) {
+            return {
+              lines: [
+                ['密文（base64）', B64(salt.buffer) + '.' + B64(iv.buffer) + '.' + B64(ct)],
+                ['格式', '盐.IV.密文，三段都用 base64'],
+                ['参数', 'PBKDF2-SHA256 · 15 万轮 · AES-GCM-256']
+              ]
+            };
+          });
+        }
+        var parts = v.text.trim().split('.');
+        if (parts.length !== 3) throw new Error('密文格式应为 盐.IV.密文');
+        var s2 = UNB64(parts[0]), iv2 = UNB64(parts[1]), ct2 = UNB64(parts[2]);
+        return derive(v.pass, s2).then(function (key) {
+          return window.crypto.subtle.decrypt({ name: 'AES-GCM', iv: iv2 }, key, ct2);
+        }).then(function (pt) {
+          return { lines: [['明文', new TextDecoder().decode(pt)], ['提示', '密码不对或密文被改过都会解密失败']] };
+        });
+      }
+    });
+  })();
+
+  /* JWT HS256 签发 */
+  (function () {
+    function b64u(bytes) {
+      var s = '';
+      var b = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+      for (var i = 0; i < b.length; i++) s += String.fromCharCode(b[i]);
+      return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    }
+    function b64uStr(str) { return b64u(new TextEncoder().encode(str)); }
+    t2form({
+      id: 'jwtgen', cat: 'safe', icon: '🎫', name: 'JWT 签发（HS256）',
+      desc: '填 payload 与密钥，直接生成可以拿去调接口的 token',
+      btn: '生成 token',
+      fields: [
+        { id: 'header', label: 'header', type: 'text', value: '{"alg":"HS256","typ":"JWT"}' },
+        { id: 'payload', label: 'payload', type: 'text', value: '{"sub":"demo","exp":0}' },
+        { id: 'secret', label: '密钥', type: 'text', ph: '与对方约定的字符串' }
+      ],
+      compute: function (v) {
+        if (!window.crypto || !window.crypto.subtle) throw new Error('需要 WebCrypto');
+        var h, p;
+        try { h = JSON.parse(v.header); } catch (e) { throw new Error('header 不是合法 JSON'); }
+        try { p = JSON.parse(v.payload); } catch (e) { throw new Error('payload 不是合法 JSON'); }
+        if (!v.secret) throw new Error('填一下密钥');
+        var head = b64uStr(JSON.stringify(h)) + '.' + b64uStr(JSON.stringify(p));
+        return window.crypto.subtle.importKey('raw', new TextEncoder().encode(v.secret),
+          { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
+          .then(function (key) {
+            return window.crypto.subtle.sign('HMAC', key, new TextEncoder().encode(head));
+          }).then(function (sig) {
+            return {
+              lines: [
+                ['token', head + '.' + b64u(sig)],
+                ['有效期', p.exp ? new Date(p.exp * 1000).toLocaleString('zh-CN') : '未设置 exp'],
+                ['提醒', '密钥只在本地参与计算，别把这段贴给别人']
+              ]
+            };
+          });
+      }
+    });
+  })();
+
+  /* otpauth 链接 */
+  t2form({
+    id: 'otpauth', cat: 'safe', icon: '📱', name: 'otpauth 链接生成',
+    desc: '把 TOTP 密钥变成认证器能扫的 otpauth:// 链接（不生成二维码图片）',
+    btn: '生成链接',
+    fields: [
+      { id: 'issuer', label: '服务名', type: 'text', value: 'xkmyth' },
+      { id: 'account', label: '账号', type: 'text', value: 'me@example.com' },
+      { id: 'secret', label: '密钥（base32）', type: 'text', ph: 'JBSWY3DPEHPK3PXP' },
+      { id: 'digits', label: '位数', type: 'select', options: [['6', '6 位'], ['8', '8 位']], value: '6' },
+      { id: 'period', label: '周期（秒）', type: 'number', value: '30' }
+    ],
+    compute: function (v) {
+      var s = String(v.secret || '').replace(/\s+/g, '').toUpperCase().replace(/=+$/, '');
+      if (!/^[A-Z2-7]+$/.test(s)) throw new Error('密钥只能包含 A-Z 与 2-7');
+      if (s.length < 8) throw new Error('密钥太短');
+      var label = encodeURIComponent(v.issuer) + ':' + encodeURIComponent(v.account);
+      var q = 'secret=' + s + '&issuer=' + encodeURIComponent(v.issuer) +
+        '&algorithm=SHA1&digits=' + v.digits + '&period=' + (v.period || 30);
+      return {
+        lines: [
+          ['链接', 'otpauth://totp/' + label + '?' + q],
+          ['密钥', s],
+          ['说明', '把链接贴进支持 otpauth 的客户端，或者自己生成二维码']
+        ]
+      };
+    }
+  });
+
+  /* PBKDF2 密码派生 */
+  t2form({
+    id: 'pwhash', cat: 'safe', icon: '🧂', name: 'PBKDF2 密码派生',
+    desc: '用密码 + 盐派生出定长密钥，看看轮数对耗时的影响',
+    btn: '派生',
+    fields: [
+      { id: 'pass', label: '密码', type: 'text', ph: '要派生的密码' },
+      { id: 'salt', label: '盐', type: 'text', value: 'xkmyth-salt' },
+      { id: 'iter', label: '轮数', type: 'select', options: [['1', '1 轮（演示）'], ['10000', '1 万'], ['100000', '10 万'], ['310000', '31 万（OWASP 建议）']], value: '100000' },
+      { id: 'len', label: '输出位数', type: 'select', options: [['256', '256 位'], ['512', '512 位']], value: '256' }
+    ],
+    compute: function (v) {
+      if (!window.crypto || !window.crypto.subtle) throw new Error('需要 WebCrypto');
+      if (!v.pass) throw new Error('填一下密码');
+      var t0 = performance.now();
+      return window.crypto.subtle.importKey('raw', new TextEncoder().encode(v.pass), 'PBKDF2', false, ['deriveBits'])
+        .then(function (k) {
+          return window.crypto.subtle.deriveBits(
+            { name: 'PBKDF2', salt: new TextEncoder().encode(v.salt), iterations: Number(v.iter), hash: 'SHA-256' },
+            k, Number(v.len));
+        }).then(function (bits) {
+          var hex = '';
+          var arr = new Uint8Array(bits);
+          for (var i = 0; i < arr.length; i++) hex += ('0' + arr[i].toString(16)).slice(-2);
+          return {
+            lines: [
+              ['派生结果（hex）', hex],
+              ['耗时', Math.round(performance.now() - t0) + ' ms'],
+              ['参数', 'PBKDF2-SHA256 · ' + v.iter + ' 轮 · ' + v.len + ' 位'],
+              ['用法', '存库时存「盐 + 轮数 + 结果」，别存密码本身']
+            ]
+          };
+        });
+    }
+  });
+
+  /* ---- time ---- */
+
+  t2form({
+    id: 'agecalc', cat: 'time', icon: '🎂', name: '年龄与下次生日',
+    desc: '算周岁、下次生日还有几天、活了多少天',
+    btn: '算一算',
+    fields: [
+      { id: 'birth', label: '出生日期', type: 'date', value: '2000-01-01' },
+      { id: 'now', label: '参照日期', type: 'date' }
+    ],
+    compute: function (v) {
+      var b = new Date(v.birth + 'T00:00:00');
+      if (isNaN(b)) throw new Error('出生日期不对');
+      var n = v.now ? new Date(v.now + 'T00:00:00') : new Date();
+      if (n < b) throw new Error('参照日期早于出生日期');
+      var age = n.getFullYear() - b.getFullYear();
+      var hadBirthday = (n.getMonth() > b.getMonth()) ||
+        (n.getMonth() === b.getMonth() && n.getDate() >= b.getDate());
+      if (!hadBirthday) age--;
+      var next = new Date(n.getFullYear(), b.getMonth(), b.getDate());
+      if (next < n) next = new Date(n.getFullYear() + 1, b.getMonth(), b.getDate());
+      var days = Math.round((next - n) / 86400000);
+      var lived = Math.round((n - b) / 86400000);
+      return {
+        lines: [
+          ['周岁', age + ' 岁'],
+          ['下次生日', next.toLocaleDateString('zh-CN') + '（还有 ' + days + ' 天）'],
+          ['已经活了', lived.toLocaleString('zh-CN') + ' 天'],
+          ['折合', Math.floor(lived / 7) + ' 周 · 约 ' + (lived / 365.2425).toFixed(2) + ' 年']
+        ]
+      };
+    }
+  });
+
+  t2form({
+    id: 'workdays', cat: 'time', icon: '📅', name: '工作日推算',
+    desc: '从某天起加 N 个工作日，跳过周六周日（不含法定节假日调休）',
+    btn: '推算',
+    fields: [
+      { id: 'start', label: '起始日期', type: 'date' },
+      { id: 'n', label: '再加几个工作日', type: 'number', value: '5' }
+    ],
+    compute: function (v) {
+      var d = v.start ? new Date(v.start + 'T00:00:00') : new Date();
+      if (isNaN(d)) throw new Error('日期不对');
+      var left = Math.abs(Number(v.n) || 0), step = Number(v.n) < 0 ? -1 : 1;
+      var guard = 0;
+      while (left > 0 && guard++ < 4000) {
+        d.setDate(d.getDate() + step);
+        var w = d.getDay();
+        if (w !== 0 && w !== 6) left--;
+      }
+      var wd = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][d.getDay()];
+      return {
+        lines: [
+          ['结果日期', d.toLocaleDateString('zh-CN') + '（' + wd + '）'],
+          ['跳过了', (Math.abs(Number(v.n)) * 2) + ' 天周末（近似）'],
+          ['提醒', '法定节假日与调休需要按当年日历另算']
+        ]
+      };
+    }
+  });
+
+  t2form({
+    id: 'countdown', cat: 'time', icon: '⏳', name: '倒计时',
+    desc: '距某个时刻还有多少天几小时几分（也能算已经过去多久）',
+    btn: '算',
+    fields: [
+      { id: 'target', label: '目标时刻', type: 'text', ph: '2026-12-31 23:59 或 2026-12-31T23:59' },
+      { id: 'base', label: '从哪算（留空=现在）', type: 'text', ph: '2026-01-01 00:00' }
+    ],
+    compute: function (v) {
+      var t = new Date(String(v.target).replace(' ', 'T'));
+      if (isNaN(t)) throw new Error('目标时刻格式不对');
+      var b = v.base ? new Date(String(v.base).replace(' ', 'T')) : new Date();
+      if (isNaN(b)) throw new Error('基准时刻格式不对');
+      var ms = t - b, past = ms < 0;
+      ms = Math.abs(ms);
+      var dd = Math.floor(ms / 86400000);
+      var hh = Math.floor((ms % 86400000) / 3600000);
+      var mm = Math.floor((ms % 3600000) / 60000);
+      var ss = Math.floor((ms % 60000) / 1000);
+      return {
+        lines: [
+          ['方向', past ? '已经过去' : '还剩'],
+          ['折算', dd + ' 天 ' + hh + ' 小时 ' + mm + ' 分 ' + ss + ' 秒'],
+          ['总小时', Math.round(Math.abs(t - b) / 3600000).toLocaleString('zh-CN') + ' 小时'],
+          ['目标（本地）', t.toLocaleString('zh-CN')]
+        ]
+      };
+    }
+  });
+
+  /* ---- net ---- */
+
+  t2form({
+    id: 'ipv6cidr', cat: 'net', icon: '🛰️', name: 'IPv6 网段计算',
+    desc: '给一个 IPv6 地址与前缀长度，算出网络地址、范围与容量',
+    btn: '计算',
+    fields: [
+      { id: 'addr', label: 'IPv6 地址', type: 'text', value: '2001:db8::1' },
+      { id: 'prefix', label: '前缀长度', type: 'number', value: '64' }
+    ],
+    compute: function (v) {
+      function expand(s) {
+        s = String(s).trim().toLowerCase();
+        if (s.indexOf('::') < 0) s = s + '::';
+        var parts = s.split('::');
+        if (parts.length > 2) throw new Error('地址里只能有一个 ::');
+        var head = parts[0] ? parts[0].split(':') : [];
+        var tail = parts[1] ? parts[1].split(':') : [];
+        var fill = 8 - head.length - tail.length;
+        if (fill < 0) throw new Error('地址段太多');
+        var mid = [];
+        for (var i = 0; i < fill; i++) mid.push('0');
+        var all = head.concat(mid, tail);
+        if (all.length !== 8) throw new Error('地址段数量不对');
+        var out = [];
+        for (var j = 0; j < 8; j++) {
+          if (!/^[0-9a-f]{1,4}$/.test(all[j])) throw new Error('段不是合法十六进制：' + all[j]);
+          out.push(parseInt(all[j], 16));
+        }
+        return out;
+      }
+      function show(a) {
+        var s = a.map(function (x) { return ('0000' + x.toString(16)).slice(-4); }).join(':');
+        return s.replace(/(^|:)0(:0)+(:|$)/, '::').replace(/:{3,}/, '::');
+      }
+      var a = expand(v.addr);
+      var p = Number(v.prefix);
+      if (!(p >= 0 && p <= 128)) throw new Error('前缀要在 0-128');
+      var mask = [];
+      for (var i = 0; i < 8; i++) mask.push(0);
+      for (var bit = 0; bit < p; bit++) mask[Math.floor(bit / 16)] |= (1 << (15 - (bit % 16)));
+      var net = a.map(function (x, i) { return x & mask[i]; });
+      var last = net.slice();
+      for (var b2 = p; b2 < 128; b2++) last[Math.floor(b2 / 16)] |= (1 << (15 - (b2 % 16)));
+      return {
+        lines: [
+          ['网络地址', show(net) + '/' + p],
+          ['首个地址', show(net)],
+          ['末个地址', show(last)],
+          ['地址数量', p >= 64 ? '2^' + (128 - p) + '（极大）' : Math.pow(2, 128 - p).toLocaleString('zh-CN')],
+          ['提示', 'IPv6 通常直接给 /64 一整段出去']
+        ]
+      };
+    }
+  });
+
+  t2form({
+    id: 'wol', cat: 'net', icon: '🔌', name: 'Wake-on-LAN 魔术包',
+    desc: '生成唤醒包（前导 FF×6 + MAC×16）的十六进制串与校验',
+    btn: '生成',
+    fields: [
+      { id: 'mac', label: 'MAC 地址', type: 'text', value: '00:11:22:33:44:55' }
+    ],
+    compute: function (v) {
+      var m = String(v.mac).replace(/[^0-9a-fA-F]/g, '').toLowerCase();
+      if (m.length !== 12) throw new Error('MAC 应为 12 位十六进制');
+      var out = 'ff'.repeat(6);
+      for (var i = 0; i < 16; i++) out += m;
+      var pretty = out.match(/.{1,2}/g).join(' ');
+      return {
+        lines: [
+          ['魔术包（hex）', pretty],
+          ['字节数', (out.length / 2) + ' 字节（6 + 12×16 = 102 字节）'],
+          ['怎么用', '用 `wakeonlan` 命令或路由器/树莓派发这个包；目标机 BIOS 与网卡需开启 WoL'],
+          ['纯 hex', out]
+        ]
+      };
+    }
+  });
+
+  t2form({
+    id: 'urltemplate', cat: 'net', icon: '🧩', name: 'URL 模板拼装',
+    desc: '把 /users/{id} 这类模板和参数拼成完整 URL，自动做编码',
+    btn: '拼装',
+    fields: [
+      { id: 'tpl', label: '模板', type: 'text', value: '/api/users/{id}/posts?tag={tag}' },
+      { id: 'base', label: '基础地址（可空）', type: 'text', value: 'https://example.com' },
+      { id: 'vars', label: '参数（每行 key=value）', type: 'text', ph: 'id=42\ntag=C++ 与 Rust' }
+    ],
+    compute: function (v) {
+      var vars = {};
+      String(v.vars || '').split(/\r?\n/).forEach(function (line) {
+        if (!line.trim()) return;
+        var i = line.indexOf('=');
+        if (i < 0) throw new Error('参数行缺少 =：' + line);
+        vars[line.slice(0, i).trim()] = line.slice(i + 1);
+      });
+      var missing = [];
+      var url = String(v.tpl).replace(/\{([^}]+)\}/g, function (_, k) {
+        if (!(k in vars)) { missing.push(k); return '{' + k + '}'; }
+        return encodeURIComponent(vars[k]);
+      });
+      var full;
+      try { full = new URL(url, v.base || 'https://example.com').href; }
+      catch (e) { full = (v.base || '') + url; }
+      return {
+        lines: [
+          ['结果', full],
+          missing.length ? ['缺少参数', missing.join(', ')] : ['参数', Object.keys(vars).length + ' 个全部命中'],
+          ['编码说明', '变量做 encodeURIComponent，路径与查询串原样保留']
+        ]
+      };
+    }
+  });
+
+  /* ---- num ---- */
+
+  t2form({
+    id: 'bitshift', cat: 'num', icon: '🔢', name: '位运算与二进制视图',
+    desc: '把 32 位整数摊成二进制，做与/或/异或/移位并给出每一步',
+    btn: '算',
+    fields: [
+      { id: 'a', label: '数 A', type: 'number', value: '13' },
+      { id: 'b', label: '数 B', type: 'number', value: '7' },
+      { id: 'op', label: '运算', type: 'select', options: [['and', 'A & B'], ['or', 'A | B'], ['xor', 'A ^ B'], ['shl', 'A << B'], ['shr', 'A >> B'], ['not', '~A']], value: 'and' }
+    ],
+    compute: function (v) {
+      var a = t2int(v.a) | 0, b = t2int(v.b) | 0;
+      var r;
+      if (v.op === 'and') r = a & b;
+      else if (v.op === 'or') r = a | b;
+      else if (v.op === 'xor') r = a ^ b;
+      else if (v.op === 'shl') r = a << b;
+      else if (v.op === 'shr') r = a >> b;
+      else r = ~a;
+      var bin = function (n) {
+        return ((n >>> 0).toString(2)).padStart(32, '0').replace(/(.{4})/g, '$1 ').trim();
+      };
+      return {
+        lines: [
+          ['结果（十进制）', String(r)],
+          ['结果（无符号）', String(r >>> 0)],
+          ['A', bin(a)],
+          ['B', bin(b)],
+          ['结果', bin(r)],
+          ['十六进制', '0x' + (r >>> 0).toString(16).toUpperCase()]
+        ]
+      };
+    }
+  });
+
+  t2form({
+    id: 'bytesize', cat: 'num', icon: '💾', name: '字节单位换算',
+    desc: 'B / KiB / MiB / GiB / TB 互转，顺带说明 SI 与二进制的差别',
+    btn: '换算',
+    fields: [
+      { id: 'val', label: '数值', type: 'number', value: '1.5' },
+      { id: 'unit', label: '单位', type: 'select', options: [['B', 'B'], ['KiB', 'KiB (1024)'], ['MiB', 'MiB'], ['GiB', 'GiB'], ['TB', 'TB (10^12)']], value: 'GiB' }
+    ],
+    compute: function (v) {
+      var n = t2num(v.val);
+      var toBytes = { B: 1, KiB: 1024, MiB: 1048576, GiB: 1073741824, TB: 1e12 };
+      var bytes = n * toBytes[v.unit];
+      var fmt = function (x) { return x.toLocaleString('zh-CN', { maximumFractionDigits: 3 }); };
+      return {
+        lines: [
+          ['字节', fmt(bytes) + ' B'],
+          ['二进制单位', fmt(bytes / 1024) + ' KiB · ' + fmt(bytes / 1048576) + ' MiB · ' + fmt(bytes / 1073741824) + ' GiB'],
+          ['十进制单位', fmt(bytes / 1000) + ' KB · ' + fmt(bytes / 1e6) + ' MB · ' + fmt(bytes / 1e9) + ' GB'],
+          ['差多少', '1 GiB = 1.074 GB，硬盘厂按十进制标，系统按二进制算']
+        ]
+      };
+    }
+  });
+
+  t2form({
+    id: 'percentile', cat: 'num', icon: '📊', name: '分位数与四分位',
+    desc: '一串数字里，中位数、P90、四分位距分别是多少',
+    btn: '算',
+    fields: [
+      { id: 'data', label: '数据（逗号 / 空格 / 换行分隔）', type: 'text', ph: '12, 18, 21, 30, 45, 66, 78' }
+    ],
+    compute: function (v) {
+      var nums = String(v.data).split(/[\s,;]+/).filter(Boolean).map(Number);
+      if (nums.some(function (x) { return !isFinite(x); })) throw new Error('有非数字项');
+      if (nums.length < 2) throw new Error('至少给两个数');
+      var s = nums.slice().sort(function (a, b) { return a - b; });
+      var pct = function (p) {
+        var idx = (s.length - 1) * p;
+        var lo = Math.floor(idx), hi = Math.ceil(idx);
+        return s[lo] + (s[hi] - s[lo]) * (idx - lo);
+      };
+      var q1 = pct(0.25), q3 = pct(0.75);
+      var mean = s.reduce(function (a, b) { return a + b; }, 0) / s.length;
+      return {
+        lines: [
+          ['样本数', String(s.length)],
+          ['最小 / 最大', s[0] + ' / ' + s[s.length - 1]],
+          ['中位数 P50', pct(0.5).toFixed(2)],
+          ['P90', pct(0.9).toFixed(2)],
+          ['Q1 / Q3 / 四分位距', q1.toFixed(2) + ' / ' + q3.toFixed(2) + ' / ' + (q3 - q1).toFixed(2)],
+          ['平均值', mean.toFixed(3)]
+        ]
+      };
+    }
+  });
+
+  /* ---- dev ---- */
+
+  t2form({
+    id: 'gitignore', cat: 'dev', icon: '🙈', name: '.gitignore 生成器',
+    desc: '勾几个技术栈，拼出一份能直接用的 .gitignore',
+    btn: '生成',
+    fields: [
+      { id: 'stacks', label: '技术栈（逗号分隔）', type: 'text', value: 'node,python,windows,vscode' }
+    ],
+    compute: function (v) {
+      var DB = {
+        node: ['node_modules/', 'npm-debug.log*', 'yarn-error.log', '.pnpm-store/', 'dist/', 'coverage/'],
+        python: ['__pycache__/', '*.py[cod]', '.venv/', 'venv/', '.pytest_cache/', '.mypy_cache/', '*.egg-info/'],
+        go: ['*.exe', '*.test', '*.out', 'vendor/'],
+        rust: ['target/', 'Cargo.lock'],
+        windows: ['Thumbs.db', 'desktop.ini', '$RECYCLE.BIN/', '*.lnk'],
+        mac: ['.DS_Store', '.AppleDouble', '.Spotlight-V100'],
+        vscode: ['.vscode/*', '!.vscode/settings.json', '!.vscode/extensions.json'],
+        jetbrains: ['.idea/', '*.iml'],
+        env: ['.env', '.env.*', '!.env.example', '*.pem', '*.key'],
+        logs: ['logs/', '*.log']
+      };
+      var picked = String(v.stacks).split(/[\s,]+/).filter(Boolean);
+      var unknown = picked.filter(function (k) { return !DB[k]; });
+      if (unknown.length) throw new Error('不认识：' + unknown.join(', ') + '（可选：' + Object.keys(DB).join('/') + '）');
+      var out = ['# 由 xkmyth .gitignore 生成器生成'];
+      picked.forEach(function (k) {
+        out.push('');
+        out.push('# ' + k);
+        out = out.concat(DB[k]);
+      });
+      out.push('');
+      out.push('# 永远别提交的东西');
+      out = out.concat(DB.env);
+      return out.join('\n');
+    }
+  });
+
+  t2form({
+    id: 'envjson', cat: 'dev', icon: '🔁', name: 'env ↔ JSON',
+    desc: '.env 与 JSON 两边互转，注释会被丢掉但会告诉你',
+    btn: '转换',
+    fields: [
+      { id: 'mode', label: '方向', type: 'select', options: [['e2j', '.env → JSON'], ['j2e', 'JSON → .env']], value: 'e2j' },
+      { id: 'text', label: '内容', type: 'text', ph: 'KEY=value 每行一条' }
+    ],
+    compute: function (v) {
+      if (v.mode === 'e2j') {
+        var o = {}, dropped = 0;
+        String(v.text).split(/\r?\n/).forEach(function (line) {
+          var s = line.trim();
+          if (!s) return;
+          if (s.charAt(0) === '#') { dropped++; return; }
+          var i = s.indexOf('=');
+          if (i < 0) throw new Error('这行没有 =：' + s);
+          var k = s.slice(0, i).trim().replace(/^export\s+/, '');
+          var val = s.slice(i + 1).trim().replace(/^["']|["']$/g, '');
+          o[k] = val;
+        });
+        return {
+          lines: [
+            ['JSON', JSON.stringify(o, null, 2)],
+            ['键数', String(Object.keys(o).length) + '（丢掉注释 ' + dropped + ' 行）'],
+            ['提醒', '值里的 ${VAR} 不会被展开，保持字面量']
+          ]
+        };
+      }
+      var data;
+      try { data = JSON.parse(v.text); } catch (e) { throw new Error('JSON 解析失败：' + e.message); }
+      if (typeof data !== 'object' || data === null || Array.isArray(data)) throw new Error('需要是对象');
+      var lines = Object.keys(data).map(function (k) {
+        var val = data[k];
+        if (val !== null && typeof val === 'object') val = JSON.stringify(val);
+        var s = String(val);
+        return k + '=' + (/[\s"'#]/.test(s) ? '"' + s.replace(/"/g, '\\"') + '"' : s);
+      });
+      return lines.join('\n');
+    }
+  });
+
+  t2form({
+    id: 'sqlinsert', cat: 'dev', icon: '🗃️', name: 'CSV → INSERT 语句',
+    desc: '把表头 + 数据行拼成能直接跑的 INSERT，字符串自动转义',
+    btn: '生成',
+    fields: [
+      { id: 'table', label: '表名', type: 'text', value: 'users' },
+      { id: 'csv', label: 'CSV（首行表头）', type: 'text', ph: 'id,name,email\n1,张三,a@b.c' },
+      { id: 'batch', label: '每批行数', type: 'number', value: '50' }
+    ],
+    compute: function (v) {
+      var rows = String(v.csv).split(/\r?\n/).filter(function (l) { return l.trim(); })
+        .map(function (l) { return l.split(',').map(function (c) { return c.replace(/^"|"$/g, '').trim(); }); });
+      if (rows.length < 2) throw new Error('至少要有表头 + 一行数据');
+      var heads = rows[0];
+      var q = function (val) {
+        if (val === '' ) return 'NULL';
+        if (/^-?\d+(\.\d+)?$/.test(val)) return val;
+        if (/^(true|false)$/i.test(val)) return val.toUpperCase();
+        return "'" + val.replace(/'/g, "''") + "'";
+      };
+      var cols = heads.map(function (h) { return '`' + h.replace(/`/g, '') + '`'; }).join(', ');
+      var per = Math.max(1, Number(v.batch) || 50);
+      var out = [], chunk = [];
+      for (var i = 1; i < rows.length; i++) {
+        chunk.push('(' + heads.map(function (_, k) { return q(rows[i][k] || ''); }).join(', ') + ')');
+        if (chunk.length === per || i === rows.length - 1) {
+          out.push('INSERT INTO `' + v.table.replace(/`/g, '') + '` (' + cols + ') VALUES\n  ' + chunk.join(',\n  ') + ';');
+          chunk = [];
+        }
+      }
+      return { lines: [['语句数', out.length + ' 条（每批 ' + per + ' 行）'], ['SQL', out.join('\n\n')]] };
+    }
+  });
+
+  t2form({
+    id: 'magic', cat: 'dev', icon: '🔎', name: '文件头识别',
+    desc: '粘一段十六进制，猜这是什么文件（PNG / JPEG / ZIP / PDF …）',
+    btn: '识别',
+    fields: [
+      { id: 'hex', label: '开头几个字节（hex）', type: 'text', value: '89 50 4e 47 0d 0a 1a 0a' }
+    ],
+    compute: function (v) {
+      var h = String(v.hex).replace(/[^0-9a-fA-F]/g, '').toLowerCase();
+      if (h.length < 4) throw new Error('至少给两个字节');
+      var SIG = [
+        ['89504e47', 'PNG 图片', '数据块从 49484452 (IHDR) 开始'],
+        ['ffd8ff', 'JPEG 图片', '以 ffd9 结束'],
+        ['47494638', 'GIF 图片', 'GIF87a / GIF89a'],
+        ['25504446', 'PDF 文档', '版本号跟在 %PDF- 后面'],
+        ['504b0304', 'ZIP / docx / xlsx / apk / jar', '都是 zip 容器，看内部目录才能细分'],
+        ['377abcaf271c', '7z 压缩包', ''],
+        ['526172211a07', 'RAR 压缩包', ''],
+        ['1f8b', 'gzip 压缩', ''],
+        ['424d', 'BMP 图片', ''],
+        ['494433', 'MP3 音频', 'ID3 标签开头'],
+        ['664c6143', 'FLAC 音频', ''],
+        ['4f676753', 'OGG 媒体', ''],
+        ['000001ba', 'MPEG 视频', ''],
+        ['0000001866747970', 'MP4 视频', 'ftyp 盒子'],
+        ['52494646', 'RIFF（WAV / AVI / WebP）', '看第 9-12 字节判断具体类型'],
+        ['1a45dfa3', 'Matroska / WebM', ''],
+        ['7f454c46', 'ELF 可执行（Linux）', ''],
+        ['4d5a', 'PE 可执行（Windows exe/dll）', ''],
+        ['cafebabe', 'Java class / Mach-O fat', '看长度与后续字节'],
+        ['6465780a', 'Android dex', ''],
+        ['0000000c6a502020', 'JPEG 2000', ''],
+        ['efbbbf', 'UTF-8 BOM（文本）', '']
+      ];
+      var hit = SIG.filter(function (s) { return h.indexOf(s[0]) === 0; });
+      var lines = [['输入', h.length / 2 + ' 字节']];
+      if (hit.length) {
+        hit.forEach(function (s) { lines.push([s[1], s[2] || '（签名匹配）']); });
+      } else {
+        lines.push(['没匹配到已知签名', '可能是不常见格式，或开头被写过别的东西']);
+        lines.push(['前 8 字节', h.slice(0, 16).replace(/(..)/g, '$1 ').trim()]);
+      }
+      return { lines: lines };
+    }
+  });
+
+  /* ---- file ---- */
+
+  t2form({
+    id: 'b64file', cat: 'file', icon: '📥', name: 'Base64 → 文件',
+    desc: '把一段 base64（可带 data: 前缀）还原成文件并下载，全部在本地',
+    btn: '还原并下载',
+    fields: [
+      { id: 'name', label: '文件名', type: 'text', value: 'download.bin' },
+      { id: 'data', label: 'base64', type: 'text', ph: 'iVBORw0KGgo...' }
+    ],
+    compute: function (v) {
+      var s = String(v.data).trim();
+      var mime = '';
+      var m = s.match(/^data:([^;,]+)?(;base64)?,/);
+      if (m) { mime = m[1] || 'application/octet-stream'; s = s.slice(m[0].length); }
+      s = s.replace(/\s+/g, '');
+      if (!/^[A-Za-z0-9+/=_-]*$/.test(s)) throw new Error('含有非 base64 字符');
+      var bin = atob(s.replace(/-/g, '+').replace(/_/g, '/'));
+      var arr = new Uint8Array(bin.length);
+      for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+      var blob = new Blob([arr], { type: mime || 'application/octet-stream' });
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = v.name || 'download.bin';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 3000);
+      return {
+        lines: [
+          ['大小', humanBytes(arr.length)],
+          ['类型', mime || '未知（按二进制写盘）'],
+          ['已开始下载', v.name || 'download.bin']
+        ]
+      };
+    }
+  });
+
+  t2form({
+    id: 'textfile', cat: 'file', icon: '📄', name: '文本存成文件',
+    desc: '把框里的文本存成 .txt / .csv / .json / .md，自动带 BOM 以便 Excel 识别',
+    btn: '下载',
+    fields: [
+      { id: 'name', label: '文件名', type: 'text', value: 'note.txt' },
+      { id: 'bom', label: '加 UTF-8 BOM', type: 'select', options: [['1', '加（Excel 友好）'], ['0', '不加']], value: '1' },
+      { id: 'body', label: '内容', type: 'text', ph: '要保存的文本' }
+    ],
+    compute: function (v) {
+      var text = String(v.body || '');
+      if (!text.trim()) throw new Error('内容是空的');
+      var parts = [v.bom === '1' ? '\ufeff' : '', text];
+      var blob = new Blob(parts, { type: 'text/plain;charset=utf-8' });
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = v.name || 'note.txt';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 3000);
+      return {
+        lines: [
+          ['字节数', humanBytes(new Blob(parts).size)],
+          ['字符数', String([...text].length)],
+          ['已开始下载', v.name || 'note.txt']
+        ]
+      };
+    }
+  });
+
+  /* ---- text ---- */
+
+  t2text({
+    id: 'nato', cat: 'text', icon: '📻', name: '字母表拼读',
+    desc: '把字母换成 NATO 拼读（Alpha Bravo…），电话里报编码不再听错',
+    rows: 4, ph: 'xkmyth agent 7',
+    fn: function (text) {
+      var MAP = { a: 'Alpha', b: 'Bravo', c: 'Charlie', d: 'Delta', e: 'Echo', f: 'Foxtrot', g: 'Golf', h: 'Hotel', i: 'India', j: 'Juliett', k: 'Kilo', l: 'Lima', m: 'Mike', n: 'November', o: 'Oscar', p: 'Papa', q: 'Quebec', r: 'Romeo', s: 'Sierra', t: 'Tango', u: 'Uniform', v: 'Victor', w: 'Whiskey', x: 'X-ray', y: 'Yankee', z: 'Zulu' };
+      var out = [];
+      [...String(text).toLowerCase()].forEach(function (ch) {
+        if (/[a-z]/.test(ch)) out.push(MAP[ch]);
+        else if (/\d/.test(ch)) out.push('[' + ch + ']');
+        else if (/\s/.test(ch)) out.push('/');
+      });
+      return out.join(' ') || '（没有字母）';
+    }
+  });
+
+  t2text({
+    id: 'spellout', cat: 'text', icon: '🔤', name: '数字读法（英文）',
+    desc: '1234 → one thousand two hundred thirty-four，写文案时好校对',
+    rows: 3, ph: '1234',
+    fn: function (text) {
+      var ONES = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen'];
+      var TENS = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'];
+      function three(n) {
+        var parts = [];
+        if (n >= 100) { parts.push(ONES[Math.floor(n / 100)] + ' hundred'); n %= 100; }
+        if (n >= 20) {
+          var t = TENS[Math.floor(n / 10)];
+          var r = n % 10;
+          parts.push(r ? t + '-' + ONES[r] : t);
+        } else if (n > 0) parts.push(ONES[n]);
+        return parts.join(' ');
+      }
+      var s = String(text).trim();
+      var neg = s.charAt(0) === '-';
+      if (neg) s = s.slice(1);
+      if (!/^\d+$/.test(s)) throw new Error('只接受整数');
+      s = s.replace(/^0+(?=\d)/, '');
+      var groups = [];
+      for (var i = s.length; i > 0; i -= 3) groups.unshift(s.slice(Math.max(0, i - 3), i));
+      var SCALE = ['', ' thousand', ' million', ' billion', ' trillion'];
+      var words = [];
+      groups.forEach(function (g, idx) {
+        var n = Number(g);
+        if (!n) return;
+        words.push(three(n) + SCALE[groups.length - 1 - idx]);
+      });
+      return (neg ? 'negative ' : '') + (words.join(' ') || 'zero');
+    }
+  });
+
+  /* ---- 说明：本批 21 个工具，合计 160 个 ---- */
+  /* ==== 第三批工具结束 ==== */
+
   /* ---------------- 渲染 ---------------- */
   var grid = $('#tgrid');
   if (!grid) return;

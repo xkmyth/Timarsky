@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-tool="agecalc">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="算周岁、下次生日还有几天、活了多少天 — 在线年龄与下次生日，纯前端本地计算，数据不出浏览器。">
+<title>年龄与下次生日 · 在线工具 · xkmyth</title>
+<link rel="canonical" href="https://xkmyth.github.io/Timarsky/tools/agecalc/">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="xkmyth">
+<meta property="og:title" content="年龄与下次生日 · 在线工具">
+<meta property="og:description" content="算周岁、下次生日还有几天、活了多少天">
+<meta property="og:url" content="https://xkmyth.github.io/Timarsky/tools/agecalc/">
+<meta name="twitter:card" content="summary">
+<script type="application/ld+json">{"@context": "https://schema.org", "@graph": [{"@type": "SoftwareApplication", "name": "年龄与下次生日", "description": "算周岁、下次生日还有几天、活了多少天", "url": "https://xkmyth.github.io/Timarsky/tools/agecalc/", "applicationCategory": "UtilitiesApplication", "operatingSystem": "Web", "offers": {"@type": "Offer", "price": "0", "priceCurrency": "CNY"}, "isPartOf": {"@type": "WebSite", "name": "xkmyth 在线工具箱", "url": "https://xkmyth.github.io/Timarsky/tools/"}}, {"@type": "BreadcrumbList", "itemListElement": [{"@type": "ListItem", "position": 1, "name": "首页", "item": "https://xkmyth.github.io/"}, {"@type": "ListItem", "position": 2, "name": "在线工具箱", "item": "https://xkmyth.github.io/Timarsky/tools/"}, {"@type": "ListItem", "position": 3, "name": "年龄与下次生日", "item": "https://xkmyth.github.io/Timarsky/tools/agecalc/"}]}]}</script>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='45' r='16' fill='%23fcd34d'/><path d='M50 20v50M25 45h50' stroke='%23fcd34d' stroke-width='6'/><ellipse cx='50' cy='66' rx='26' ry='8' stroke='%239ae3ff' stroke-width='3' fill='none' transform='rotate(-15 50 66)'/></svg>">
+<link rel="stylesheet" href="../tools.css">
+</head>
+<body>
+<canvas id="sky"></canvas>
+
+<header class="header">
+  <div class="logo"><a href="../../">★ xkmyth</a> · 在线工具箱</div>
+  <div class="nav">
+    <a href="../">全部工具</a>
+    <a href="../../">速查手册</a>
+    <a href="../../#m1">Windows</a>
+    <a href="https://xkmyth.github.io/">主站</a>
+  </div>
+</header>
+
+<main class="tp">
+  <nav class="tp-crumb" aria-label="面包屑">
+    <a href="https://xkmyth.github.io/">首页</a><span>›</span>
+    <a href="../">在线工具箱</a><span>›</span>
+    <a href="../#tool-agecalc">时间与日期</a><span>›</span>
+    <span class="tp-cur">年龄与下次生日</span>
+  </nav>
+
+  <div class="tp-head">
+    <div class="tp-head-main">
+      <p class="tp-eyebrow">🎂 时间与日期 · time</p>
+      <h1 class="tp-title">年龄与下次生日</h1>
+      <p class="tp-lead">算周岁、下次生日还有几天、活了多少天</p>
+    </div>
+    <div class="tp-actions">
+      <button class="t-btn" type="button" data-copy-page>复制本页链接</button>
+      <a class="t-btn ghost" href="../#tool-agecalc">在列表里看</a>
+    </div>
+  </div>
+
+  <div class="tp-grid">
+    <section class="tp-live">
+      <h2 class="tp-h2">就在这儿用</h2>
+      <p class="tp-live-note">下面这个就是真的工具本体，跟你去工具箱里点开的是同一个。</p>
+      <div class="tgrid" id="tgrid"></div>
+      <p class="tp-privacy">所有计算都在你的浏览器里完成 · 不联网 · 不上传 · 刷新即重置</p>
+    </section>
+
+    <aside class="tp-side">
+      <section class="tp-card">
+        <h2 class="tp-h2">什么时候用</h2>
+        <p>周岁不是「年份相减」，生日没到要减一；写请假、体检、买票时常被这个绊住。</p>
+      </section>
+      <section class="tp-card">
+        <h2 class="tp-h2">怎么用</h2>
+        <ol class="tp-steps"><li>填日期、时间或时间戳</li><li>按需要切换时区或单位</li><li>结果连同推导过程一起给出</li></ol>
+      </section>
+      <section class="tp-card">
+        <h2 class="tp-h2">长得什么样</h2>
+        <pre class="tp-ex">出生 2000-01-01，参照 2026-10-17 · 输出 26 岁、下次生日 2027-01-01、已经活了 9771 天</pre>
+      </section>
+      <section class="tp-card tp-card-tip">
+        <h2 class="tp-h2">注意</h2>
+        <p>全部按本地日期算，不含时区换算；2 月 29 日出生的人在平年会落到 3 月 1 日附近，规则按各国法律不同。</p>
+      </section>
+      <section class="tp-card">
+        <h2 class="tp-h2">同类工具</h2>
+        <ul class="tp-rel">          <li><a href="../ts/">⏱️ 时间戳转换</a></li>
+          <li><a href="../datecalc/">📅 日期计算</a></li>
+          <li><a href="../tz/">🌍 世界时钟</a></li>
+          <li><a href="../date2ts/">📅 日期 ↔ 时间戳</a></li>
+          <li><a href="../weeknum/">🗓️ ISO 周数</a></li>
+          <li><a href="../dateadd/">➕ 日期加减</a></li></ul>
+      </section>
+    </aside>
+  </div>
+
+  <nav class="tp-pager" aria-label="上下一个工具">
+    <a class="tp-prev" href="../pwhash/">← 🧂 PBKDF2 密码派生</a>
+    <a class="tp-next" href="../workdays/">📅 工作日推算 →</a>
+  </nav>
+</main>
+
+<footer class="foot">
+  <p>© <span id="year">2026</span> 星空神话 xkmyth · 工具详情 · 所有计算都在你的浏览器里完成</p>
+  <p class="foot-links">
+    <a href="../">全部工具</a> ·
+    <a href="../../">速查手册</a> ·
+    <a href="https://xkmyth.github.io/">主站</a> ·
+    <a href="https://xkmyth.github.io/xkmyth/">Downloads</a> ·
+    <a href="https://xkmyth.github.io/support/">反馈</a>
+  </p>
+</footer>
+
+<div class="toast" id="toast"></div>
+<script src="../tools.js"></script>
+<script>
+(function () {
+  var y = document.getElementById('year');
+  if (y) y.textContent = String(new Date().getFullYear());
+  var btn = document.querySelector('[data-copy-page]');
+  if (btn) btn.addEventListener('click', function () {
+    var url = location.href;
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(url).then(function () {
+        if (window.toast) window.toast('链接已复制');
+      }, function () { window.prompt('复制这个链接：', url); });
+    } else {
+      window.prompt('复制这个链接：', url);
+    }
+  });
+})();
+</script>
+</body>
+</html>
