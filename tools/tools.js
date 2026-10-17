@@ -1051,7 +1051,7 @@
       }
 
       function fillUnits() {
-        var table = UNITS[catEl.value];
+        var table = UNITS[catEl.value] || UNITS.len;
         fromEl.innerHTML = '';
         Object.keys(table).forEach(function (k) {
           var o = document.createElement('option');
@@ -1063,7 +1063,8 @@
       function renderUnit() {
         var raw = valEl.value.trim(), v = Number(raw);
         if (raw === '' || isNaN(v)) { out.className = 'out err'; out.textContent = '请输入数字'; return; }
-        var cat = catEl.value, table = UNITS[cat], from = fromEl.value, lines = [];
+        var cat = catEl.value || 'len', table = UNITS[cat] || UNITS.len;
+        var from = table[fromEl.value] ? fromEl.value : Object.keys(table)[0], lines = [];
         Object.keys(table).forEach(function (to) {
           if (to === from) return;
           var r = convertUnit(cat, v, from, to);
@@ -2010,6 +2011,3011 @@
     }
   });
 
+
+/* ==== 第二批工具（batch2a）：公共构建器 + enc / text / time ==== */
+  /* ---- t2 公共构建器 ---- */
+  function t2ta(rows, ph) {
+    var t = el('textarea');
+    t.rows = rows || 5;
+    if (ph) t.placeholder = ph;
+    return t;
+  }
+
+  function t2out() {
+    var o = el('div', 'out');
+    o.textContent = '等待输入…';
+    return o;
+  }
+
+  function t2run(fn, outEl, args) {
+    var done = function (r) {
+      if (r && typeof r === 'object' && r.lines) {
+        outEl.className = 'out';
+        outEl.textContent = '';
+        r.lines.forEach(function (kv) {
+          var d = el('div', 'kvline');
+          var k = el('span'); k.textContent = kv[0];
+          var v = el('span'); v.textContent = kv[1];
+          d.appendChild(k); d.appendChild(v);
+          outEl.appendChild(d);
+        });
+        flash(outEl);
+        return;
+      }
+      outEl.className = 'out';
+      outEl.textContent = (r === '' || r === undefined || r === null) ? '（空结果）' : String(r);
+      flash(outEl);
+    };
+    try {
+      var r = fn.apply(null, args || []);
+      if (r && typeof r.then === 'function') {
+        outEl.className = 'out';
+        outEl.textContent = '计算中…';
+        r.then(done, function (e) {
+          outEl.className = 'out err';
+          outEl.textContent = '⚠ ' + (e && e.message ? e.message : '计算出错');
+        });
+        return;
+      }
+      done(r);
+    } catch (e) {
+      outEl.className = 'out err';
+      outEl.textContent = '⚠ ' + (e && e.message ? e.message : '计算出错');
+    }
+  }
+
+  function t2def(id, cat, icon, name, desc, build) {
+    TOOLS.push({ id: id, cat: cat, icon: icon, name: name, desc: desc, build: build });
+  }
+
+  function t2mkParam(p) {
+    var wrap = el('div', 'field');
+    var lb = el('label');
+    lb.textContent = p.label || '参数';
+    var inp;
+    if (p.type === 'select') {
+      inp = el('select');
+      (p.options || []).forEach(function (o) {
+        var op = el('option');
+        op.value = o[0]; op.textContent = o[1];
+        inp.appendChild(op);
+      });
+    } else {
+      inp = el('input');
+      inp.type = p.type || 'text';
+      if (p.min != null) inp.min = p.min;
+      if (p.max != null) inp.max = p.max;
+      if (p.step != null) inp.step = p.step;
+      inp.placeholder = p.ph || '';
+    }
+    if (p.value != null) inp.value = p.value;
+    wrap.appendChild(lb);
+    wrap.appendChild(inp);
+    return { wrap: wrap, input: inp };
+  }
+
+  function t2text(def) {
+    t2def(def.id, def.cat, def.icon, def.name, def.desc, function (card) {
+      var ta = t2ta(def.rows || 5, def.ph || '');
+      if (def.value) ta.value = def.value;
+      var pm = def.param ? t2mkParam(def.param) : null;
+      var outEl = t2out();
+      var bar = el('div', 'row');
+      var runB = el('button', 't-btn');
+      runB.type = 'button'; runB.textContent = '执行';
+      var copyB = el('button', 't-btn ghost');
+      copyB.type = 'button'; copyB.textContent = '复制结果';
+      copyB.addEventListener('click', function () { copyText(outEl.textContent); });
+      var go = function () { t2run(def.fn, outEl, pm ? [ta.value, pm.input.value] : [ta.value]); };
+      runB.addEventListener('click', go);
+      ta.addEventListener('input', go);
+      if (pm) {
+        pm.input.addEventListener('input', go);
+        pm.input.addEventListener('change', go);
+      }
+      bar.appendChild(runB);
+      bar.appendChild(copyB);
+      card.appendChild(ta);
+      if (pm) card.appendChild(pm.wrap);
+      card.appendChild(bar);
+      card.appendChild(outEl);
+      if (def.fn.length <= 1 || !pm) go();
+    });
+  }
+
+  function t2form(def) {
+    t2def(def.id, def.cat, def.icon, def.name, def.desc, function (card) {
+      var inputs = {};
+      (def.fields || []).forEach(function (f) {
+        var pm = t2mkParam(f);
+        inputs[f.id] = pm.input;
+        card.appendChild(pm.wrap);
+      });
+      var outEl = t2out();
+      var bar = el('div', 'row');
+      var runB = el('button', 't-btn');
+      runB.type = 'button'; runB.textContent = def.btn || '计算';
+      var copyB = el('button', 't-btn ghost');
+      copyB.type = 'button'; copyB.textContent = '复制结果';
+      copyB.addEventListener('click', function () { copyText(outEl.textContent); });
+      var go = function () {
+        var vals = {};
+        Object.keys(inputs).forEach(function (k) { vals[k] = inputs[k].value; });
+        t2run(function () { return def.compute(vals); }, outEl, []);
+      };
+      runB.addEventListener('click', go);
+      Object.keys(inputs).forEach(function (k) {
+        inputs[k].addEventListener('change', go);
+        inputs[k].addEventListener('input', go);
+      });
+      card.appendChild(bar);
+      card.appendChild(outEl);
+      go();
+    });
+  }
+
+  function t2js(def, build) {
+    t2def(def.id, def.cat, def.icon, def.name, def.desc, build);
+  }
+
+  function t2num(v) {
+    var n = Number(String(v).trim());
+    if (!isFinite(n)) throw new Error('请输入有效数字');
+    return n;
+  }
+
+  function t2int(v) {
+    var n = t2num(v);
+    if (Math.floor(n) !== n) throw new Error('请输入整数');
+    return n;
+  }
+
+  /* ---- enc ---- */
+  var B32 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+  function b32enc(str) {
+    var bytes = new TextEncoder().encode(str), out = '', buf = 0, bits = 0;
+    for (var i = 0; i < bytes.length; i++) {
+      buf = (buf << 8) | bytes[i]; bits += 8;
+      while (bits >= 5) { out += B32[(buf >>> (bits - 5)) & 31]; bits -= 5; }
+    }
+    if (bits > 0) out += B32[(buf << (5 - bits)) & 31];
+    while (out.length % 8) out += '=';
+    return out;
+  }
+  function b32dec(str) {
+    var s = str.replace(/=+$/, '').replace(/\s+/g, '').toUpperCase();
+    var bytes = [], buf = 0, bits = 0;
+    for (var i = 0; i < s.length; i++) {
+      var v = B32.indexOf(s[i]);
+      if (v < 0) throw new Error('非 Base32 字符：' + s[i]);
+      buf = (buf << 5) | v; bits += 5;
+      if (bits >= 8) { bytes.push((buf >>> (bits - 8)) & 255); bits -= 8; }
+    }
+    return new TextDecoder().decode(new Uint8Array(bytes));
+  }
+  t2text({
+    id: 'base32', cat: 'enc', icon: '🅱️', name: 'Base32 编解码',
+    desc: 'RFC 4648 Base32，常用于密钥与一次性口令的书写格式',
+    rows: 4, ph: '输入文本或 Base32 串…',
+    param: { label: '方向', type: 'select', value: 'enc', options: [['enc', '编码'], ['dec', '解码']] },
+    fn: function (s, dir) { return dir === 'dec' ? b32dec(s) : b32enc(s); }
+  });
+
+  t2text({
+    id: 'rot13', cat: 'enc', icon: '🔄', name: 'ROT13 / 凯撒位移',
+    desc: '字母整体位移，负数即反向；13 是最经典的自我对称值',
+    rows: 4, ph: 'Hello, 世界',
+    param: { label: '位移量', type: 'number', value: 13, min: -25, max: 25 },
+    fn: function (s, k) {
+      var n = ((t2int(k) % 26) + 26) % 26;
+      return s.replace(/[a-zA-Z]/g, function (c) {
+        var base = c <= 'Z' ? 65 : 97;
+        return String.fromCharCode(base + (c.charCodeAt(0) - base + n) % 26);
+      });
+    }
+  });
+
+  var MORSE = { A: '.-', B: '-...', C: '-.-.', D: '-..', E: '.', F: '..-.', G: '--.', H: '....',
+    I: '..', J: '.---', K: '-.-', L: '.-..', M: '--', N: '-.', O: '---', P: '.--.', Q: '--.-',
+    R: '.-.', S: '...', T: '-', U: '..-', V: '...-', W: '.--', X: '-..-', Y: '-.--', Z: '--..',
+    0: '-----', 1: '.----', 2: '..---', 3: '...--', 4: '....-', 5: '.....', 6: '-....',
+    7: '--...', 8: '---..', 9: '----.', '.': '.-.-.-', ',': '--..--', '?': '..--..', '!': '-.-.--',
+    '/': '-..-.', '-': '-....-', '(': '-.--.', ')': '-.--.-', ':': '---...', "'": '.----.',
+    '=': '-...-', '+': '.-.-.', '@': '.--.-.' };
+  t2text({
+    id: 'morse', cat: 'enc', icon: '📡', name: '摩尔斯电码',
+    desc: '字母数字与常用符号的国际摩尔斯编码互转，字母间空格、单词间斜杠',
+    rows: 4, ph: 'SOS 或 ... --- ...',
+    param: { label: '方向', type: 'select', value: 'enc', options: [['enc', '编码'], ['dec', '解码']] },
+    fn: function (s, dir) {
+      if (dir === 'enc') {
+        return s.toUpperCase().split(/(\s+)/).map(function (w) {
+          if (/^\s+$/.test(w)) return ' ';
+          return w.split('').map(function (c) { return MORSE[c] || ''; }).filter(Boolean).join(' ');
+        }).join('/').replace(/\/+/g, ' / ');
+      }
+      var rev = {};
+      Object.keys(MORSE).forEach(function (k) { rev[MORSE[k]] = k; });
+      return s.trim().split(/\s*\/\s*/).map(function (word) {
+        return word.trim().split(/\s+/).map(function (code) {
+          if (!rev[code]) throw new Error('无法识别的电码：' + code);
+          return rev[code];
+        }).join('');
+      }).join(' ');
+    }
+  });
+
+  t2text({
+    id: 'htmlent', cat: 'enc', icon: '🔡', name: 'HTML 实体转义',
+    desc: '把 &amp; &lt; 与引号转成实体，避免把文本当标签执行',
+    rows: 4, ph: '<b>hi</b> & "引号"',
+    param: { label: '方向', type: 'select', value: 'enc', options: [['enc', '转义'], ['dec', '反转义']] },
+    fn: function (s, dir) {
+      if (dir === 'dec') {
+        var ta = document.createElement('textarea');
+        ta.innerHTML = s;
+        return ta.value;
+      }
+      return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+  });
+
+  t2text({
+    id: 'jsstr', cat: 'enc', icon: '⌨️', name: 'JS 字符串转义',
+    desc: '生成可安全塞进单引号字符串的文本，或把转义序列还原',
+    rows: 4, ph: 'line1\n"quoted"',
+    param: { label: '方向', type: 'select', value: 'enc', options: [['enc', '转义'], ['dec', '还原']] },
+    fn: function (s, dir) {
+      if (dir === 'dec') {
+        return s.replace(/\\(n|r|t|0|\\|'|"|u[0-9a-fA-F]{4}|x[0-9a-fA-F]{2})/g, function (m, p) {
+          if (p === 'n') return '\n';
+          if (p === 'r') return '\r';
+          if (p === 't') return '\t';
+          if (p === '0') return '\0';
+          if (p === '\\') return '\\';
+          if (p === "'" || p === '"') return p;
+          return String.fromCharCode(parseInt(p.slice(1), 16));
+        });
+      }
+      return s.replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/\r/g, '\\r')
+        .replace(/\t/g, '\\t').replace(/'/g, "\\'").replace(/"/g, '\\"');
+    }
+  });
+
+  t2text({
+    id: 'uniesc', cat: 'enc', icon: '🈚', name: 'Unicode 转义',
+    desc: '中文等非 ASCII 转成 \\uXXXX（含代理对），也能还原回来',
+    rows: 4, ph: '星空',
+    param: { label: '方向', type: 'select', value: 'enc', options: [['enc', '转义'], ['dec', '还原']] },
+    fn: function (s, dir) {
+      if (dir === 'dec') {
+        return s.replace(/\\u([0-9a-fA-F]{4})/g, function (m, h) {
+          return String.fromCharCode(parseInt(h, 16));
+        }).replace(/\\U([0-9a-fA-F]{8})/g, function (m, h) {
+          return String.fromCodePoint(parseInt(h, 16));
+        });
+      }
+      var out = '';
+      Array.from(s).forEach(function (c) {
+        var cp = c.codePointAt(0);
+        if (cp < 128) out += c;
+        else if (cp > 65535) {
+          var h = cp - 0x10000;
+          out += '\\u' + (0xD800 + (h >> 10)).toString(16).padStart(4, '0')
+            + '\\u' + (0xDC00 + (h & 0x3FF)).toString(16).padStart(4, '0');
+        } else out += '\\u' + cp.toString(16).padStart(4, '0');
+      });
+      return out;
+    }
+  });
+
+  t2text({
+    id: 'hexdump', cat: 'enc', icon: '🧱', name: '十六进制视图',
+    desc: '按 16 字节一行给出偏移、十六进制与可打印字符，排查二进制内容用',
+    rows: 3, ph: 'Hello 星空',
+    fn: function (s) {
+      var bytes = new TextEncoder().encode(s);
+      var lines = [];
+      for (var i = 0; i < bytes.length; i += 16) {
+        var chunk = bytes.slice(i, i + 16), hex = [], ascii = '';
+        for (var j = 0; j < 16; j++) {
+          hex.push(j < chunk.length ? chunk[j].toString(16).padStart(2, '0') : '  ');
+          ascii += j < chunk.length && chunk[j] >= 32 && chunk[j] < 127 ? String.fromCharCode(chunk[j]) : '.';
+        }
+        lines.push(i.toString(16).padStart(8, '0') + '  ' + hex.slice(0, 8).join(' ') + '  '
+          + hex.slice(8).join(' ') + '  |' + ascii + '|');
+      }
+      return lines.join('\n') + '\n\n共 ' + bytes.length + ' 字节';
+    }
+  });
+
+  t2text({
+    id: 'asciicodes', cat: 'enc', icon: '🔢', name: '字符码点对照',
+    desc: '逐字符给出 U+ 码点、十进制、UTF-8 字节，排查乱码与宽度问题时用',
+    rows: 3, ph: 'a星',
+    fn: function (s) {
+      var enc = new TextEncoder();
+      return Array.from(s).map(function (c) {
+        var cp = c.codePointAt(0);
+        var hex = Array.from(enc.encode(c)).map(function (b) { return b.toString(16).padStart(2, '0'); }).join(' ');
+        return JSON.stringify(c) + '  U+' + cp.toString(16).toUpperCase().padStart(4, '0')
+          + '  十进制 ' + cp + '  UTF-8 ' + hex;
+      }).join('\n');
+    }
+  });
+
+  t2text({
+    id: 'binary', cat: 'enc', icon: '💾', name: '文本 ↔ 二进制',
+    desc: 'UTF-8 字节与 0/1 位串互转，按 8 位一组并忽略空格',
+    rows: 4, ph: 'hi 或 01101000 01101001',
+    param: { label: '方向', type: 'select', value: 'enc', options: [['enc', '文本转二进制'], ['dec', '二进制转文本']] },
+    fn: function (s, dir) {
+      if (dir === 'dec') {
+        var bits = s.replace(/\s+/g, '');
+        if (!/^[01]+$/.test(bits)) throw new Error('只接受 0 与 1');
+        if (bits.length % 8) throw new Error('位数为 ' + bits.length + '，不是 8 的整数倍');
+        var bytes = [];
+        for (var i = 0; i < bits.length; i += 8) bytes.push(parseInt(bits.slice(i, i + 8), 2));
+        return new TextDecoder().decode(new Uint8Array(bytes));
+      }
+      return Array.from(new TextEncoder().encode(s)).map(function (b) {
+        return b.toString(2).padStart(8, '0');
+      }).join(' ');
+    }
+  });
+
+  t2text({
+    id: 'qsparse', cat: 'enc', icon: '🔗', name: '查询串解析 / 构造',
+    desc: '解析 a=1&b=2 成直观列表，或把 key=value 行拼成查询串',
+    rows: 4, ph: 'a=1&b=%E6%98%9F&c=2',
+    param: { label: '方向', type: 'select', value: 'parse', options: [['parse', '解析'], ['build', '构造']] },
+    fn: function (s, dir) {
+      if (dir === 'build') {
+        var pairs = s.split(/\r?\n/).map(function (l) { return l.trim(); }).filter(Boolean).map(function (l) {
+          var i = l.indexOf('=');
+          if (i < 0) throw new Error('每行需要 key=value：' + l);
+          return encodeURIComponent(l.slice(0, i).trim()) + '=' + encodeURIComponent(l.slice(i + 1).trim());
+        });
+        return '?' + pairs.join('&');
+      }
+      var q = s.trim().replace(/^[^?]*\?/, '').replace(/^#/, '');
+      if (!q) return '（没有查询参数）';
+      return q.split('&').filter(Boolean).map(function (kv, i) {
+        var k = kv.split('=')[0], v = kv.indexOf('=') < 0 ? '' : kv.slice(kv.indexOf('=') + 1);
+        var dec = '';
+        try { dec = decodeURIComponent(v.replace(/\+/g, ' ')); } catch (e) { dec = '(解码失败) ' + v; }
+        return (i + 1) + '. ' + decodeURIComponent(k.replace(/\+/g, ' ')) + ' = ' + dec;
+      }).join('\n');
+    }
+  });
+
+  /* ---- text ---- */
+  t2text({
+    id: 'dedupe', cat: 'text', icon: '🧹', name: '行去重',
+    desc: '按行去重、保留首次出现顺序，顺手可以裁掉空行',
+    rows: 6, ph: 'apple\nbanana\napple',
+    param: { label: '空行', type: 'select', value: 'drop', options: [['drop', '去掉空行'], ['keep', '保留空行']] },
+    fn: function (s, mode) {
+      var seen = {}, out = [];
+      s.split(/\r?\n/).forEach(function (l) {
+        if (!l.trim() && mode === 'drop') return;
+        if (seen[l]) return;
+        seen[l] = 1; out.push(l);
+      });
+      return out.join('\n') + '\n\n原始 ' + s.split(/\r?\n/).length + ' 行 → 去重后 ' + out.length + ' 行';
+    }
+  });
+
+  t2text({
+    id: 'sortlines', cat: 'text', icon: '🔤', name: '行排序',
+    desc: '按字典序、长度或倒序排列，可选去重',
+    rows: 6, ph: 'banana\napple\ncherry',
+    param: { label: '方式', type: 'select', value: 'asc', options: [['asc', 'A→Z'], ['desc', 'Z→A'], ['len', '按长度'], ['num', '按数字']] },
+    fn: function (s, mode) {
+      var lines = s.split(/\r?\n/).filter(function (l) { return l.length; });
+      if (mode === 'desc') lines.sort(function (a, b) { return b.localeCompare(a); });
+      else if (mode === 'len') lines.sort(function (a, b) { return a.length - b.length || a.localeCompare(b); });
+      else if (mode === 'num') lines.sort(function (a, b) { return (parseFloat(a) || 0) - (parseFloat(b) || 0); });
+      else lines.sort(function (a, b) { return a.localeCompare(b); });
+      return lines.join('\n');
+    }
+  });
+
+  t2text({
+    id: 'reverse', cat: 'text', icon: '↩️', name: '倒序',
+    desc: '整体反转字符，或只把行顺序倒过来',
+    rows: 5, ph: 'first\nsecond',
+    param: { label: '方式', type: 'select', value: 'lines', options: [['lines', '行倒序'], ['chars', '字符反转']] },
+    fn: function (s, mode) {
+      if (mode === 'chars') return Array.from(s).reverse().join('');
+      return s.split(/\r?\n/).reverse().join('\n');
+    }
+  });
+
+  t2text({
+    id: 'trimlines', cat: 'text', icon: '✂️', name: '清理行首尾空白',
+    desc: '统一裁掉多余空格与制表符，可选折叠连续空行',
+    rows: 5, ph: '   hello   \n\n\n  world',
+    param: { label: '空行', type: 'select', value: 'fold', options: [['fold', '折叠为一行'], ['drop', '全删'], ['keep', '保留']] },
+    fn: function (s, mode) {
+      var out = [];
+      s.split(/\r?\n/).forEach(function (l) {
+        var t = l.replace(/[\s\u00a0]+$/g, '').replace(/^[\s\u00a0]+/g, '');
+        if (!t) {
+          if (mode === 'drop') return;
+          if (mode === 'fold' && out.length && out[out.length - 1] === '') return;
+        }
+        out.push(t);
+      });
+      return out.join('\n');
+    }
+  });
+
+  t2text({
+    id: 'wrap', cat: 'text', icon: '📏', name: '定宽折行',
+    desc: '按字符宽度插入换行，中文按两个宽度计算，适合把长文塞进窄栏',
+    rows: 5, ph: '一段很长的话…',
+    param: { label: '每行宽度', type: 'number', value: 60, min: 10, max: 200 },
+    fn: function (s, w) {
+      var width = t2int(w);
+      return s.split(/\r?\n/).map(function (line) {
+        var out = [], cur = '', curW = 0;
+        Array.from(line).forEach(function (c) {
+          var cw = /[\u2e80-\uffff]/.test(c) ? 2 : 1;
+          if (curW + cw > width) { out.push(cur); cur = ''; curW = 0; }
+          cur += c; curW += cw;
+        });
+        if (cur) out.push(cur);
+        return out.join('\n');
+      }).join('\n');
+    }
+  });
+
+  t2text({
+    id: 'slugify', cat: 'text', icon: '🏷️', name: '标题转 slug',
+    desc: '生成 URL 友好的短名：小写、连字符、去掉标点，中文可保留或转拼音占位',
+    rows: 3, ph: 'Hello World! 星空',
+    param: { label: '中文', type: 'select', value: 'keep', options: [['keep', '保留'], ['drop', '去掉']] },
+    fn: function (s, mode) {
+      var t = s.toLowerCase().trim();
+      if (mode === 'drop') t = t.replace(/[\u4e00-\u9fa5]+/g, '-');
+      t = t.replace(/['"’]/g, '').replace(/[^\w\u4e00-\u9fa5]+/g, '-').replace(/^-+|-+$/g, '');
+      return t.replace(/-{2,}/g, '-');
+    }
+  });
+
+  t2text({
+    id: 'lorem', cat: 'text', icon: '📜', name: '假文生成',
+    desc: '生成占位段落，用来测排版；按句长组合，不是照搬固定模板',
+    rows: 6, ph: '生成结果出现在下方输出框',
+    param: { label: '句数', type: 'number', value: 5, min: 1, max: 30 },
+    fn: function (s, n) {
+      var words = ('星空 之下 万物 皆可 定制 浏览器 云盘 系统 静态 页面 校验 版本 缓存 降级 工具 应用 数据 本地 加密 专注 记账 壁纸 录音 剪贴板 片段 改名 压缩 笔记 保险箱 生态 文档 状态 基线 归档 镜像 实验 搜索 命令 面板 目录').split(' ');
+      var total = Math.min(t2int(n), 30), out = [];
+      for (var i = 0; i < total; i++) {
+        var len = 8 + Math.floor(Math.random() * 10), parts = [];
+        for (var j = 0; j < len; j++) parts.push(words[Math.floor(Math.random() * words.length)]);
+        out.push(parts.join('') + '。');
+      }
+      return out.join('');
+    }
+  });
+
+  t2text({
+    id: 'cap', cat: 'text', icon: '🅰️', name: '大小写转换',
+    desc: '句首大写、每词首字母大写、全大写或全小写，四种一次到位',
+    rows: 4, ph: 'hello world. this is a test.',
+    param: { label: '方式', type: 'select', value: 'sentence', options: [['sentence', '句首大写'], ['words', '每词首字母'], ['upper', '全大写'], ['lower', '全小写'], ['swap', '反转大小写']] },
+    fn: function (s, mode) {
+      if (mode === 'upper') return s.toUpperCase();
+      if (mode === 'lower') return s.toLowerCase();
+      if (mode === 'swap') return s.replace(/[a-zA-Z]/g, function (c) {
+        return c === c.toUpperCase() ? c.toLowerCase() : c.toUpperCase();
+      });
+      if (mode === 'words') return s.toLowerCase().replace(/(^|[\s\-_/(（])([a-z])/g, function (m, p, c) { return p + c.toUpperCase(); });
+      return s.toLowerCase().replace(/(^\s*|[.!?。！？]\s*)([a-z])/g, function (m, p, c) { return p + c.toUpperCase(); });
+    }
+  });
+
+  t2js({
+    id: 'findrep', cat: 'text', icon: '🔍', name: '查找替换',
+    desc: '普通替换或正则替换，支持分组引用 $1、全局与忽略大小写',
+    rows: 0
+  }, function (card) {
+    var ta = t2ta(5, '把要处理的文本粘在这里…');
+    var pm = t2mkParam({ label: '查找', type: 'text', value: '' });
+    var rm = t2mkParam({ label: '替换为', type: 'text', value: '' });
+    var fm = t2mkParam({ label: '标志', type: 'select', value: 'g', options: [['g', '全局 g'], ['gi', '全局 + 忽略大小写 gi'], ['', '只替换第一个'], ['i', '第一个 + 忽略大小写 i']] });
+    var outEl = t2out();
+    var bar = el('div', 'row');
+    var runB = el('button', 't-btn'); runB.type = 'button'; runB.textContent = '执行';
+    var copyB = el('button', 't-btn ghost'); copyB.type = 'button'; copyB.textContent = '复制结果';
+    copyB.addEventListener('click', function () { copyText(outEl.textContent); });
+    var go = function () {
+      t2run(function () {
+        var pat = pm.input.value;
+        if (!pat) return ta.value;
+        var re = new RegExp(pat, fm.input.value);
+        return ta.value.replace(re, rm.input.value);
+      }, outEl, []);
+    };
+    runB.addEventListener('click', go);
+    [ta, pm.input, rm.input].forEach(function (n) { n.addEventListener('input', go); });
+    fm.input.addEventListener('change', go);
+    bar.appendChild(runB); bar.appendChild(copyB);
+    card.appendChild(ta); card.appendChild(pm.wrap); card.appendChild(rm.wrap);
+    card.appendChild(fm.wrap); card.appendChild(bar); card.appendChild(outEl);
+  });
+
+  t2text({
+    id: 'wordfreq', cat: 'text', icon: '📊', name: '词频统计',
+    desc: '按词统计出现次数并排序，中英文混排都能数',
+    rows: 6, ph: '粘一段文章进来',
+    param: { label: '显示前 N', type: 'number', value: 20, min: 5, max: 200 },
+    fn: function (s, n) {
+      var top = t2int(n), map = {}, total = 0;
+      (s.match(/[\u4e00-\u9fa5]+|[A-Za-z][A-Za-z0-9_'-]*/g) || []).forEach(function (w) {
+        total++;
+        map[w] = (map[w] || 0) + 1;
+      });
+      var arr = Object.keys(map).map(function (k) { return [k, map[k]]; })
+        .sort(function (a, b) { return b[1] - a[1] || a[0].localeCompare(b[0]); }).slice(0, top);
+      var max = arr.length ? arr[0][1] : 1;
+      return arr.map(function (kv) {
+        var barLen = Math.round(kv[1] / max * 20);
+        return ('████████████████████'.slice(0, barLen) + '                    ').slice(0, 20)
+          + ' ' + kv[1] + '  ' + kv[0];
+      }).join('\n') + '\n\n共 ' + total + ' 个词，' + Object.keys(map).length + ' 种';
+    }
+  });
+
+  t2text({
+    id: 'charfreq', cat: 'text', icon: '🔠', name: '字符频次',
+    desc: '逐字符统计，含空白与标点，用来找异常字符或不可见符号',
+    rows: 6, ph: '粘文本',
+    param: { label: '显示前 N', type: 'number', value: 20, min: 5, max: 200 },
+    fn: function (s, n) {
+      var top = t2int(n), map = {};
+      Array.from(s).forEach(function (c) {
+        var k = c === '\n' ? '\\n' : c === '\t' ? '\\t' : c === ' ' ? '空格' : c;
+        map[k] = (map[k] || 0) + 1;
+      });
+      return Object.keys(map).map(function (k) { return [k, map[k]]; })
+        .sort(function (a, b) { return b[1] - a[1]; }).slice(0, top)
+        .map(function (kv) { return String(kv[1]).padStart(5) + '  ' + kv[0] + '  (U+'
+          + (kv[0].length === 1 ? kv[0].codePointAt(0).toString(16).toUpperCase() : '--') + ')'; }).join('\n');
+    }
+  });
+
+  t2text({
+    id: 'linestat', cat: 'text', icon: '🧮', name: '文本统计',
+    desc: '行数、非空行、词数、字符数、UTF-8 字节与估算阅读时长',
+    rows: 6, ph: '粘文本',
+    fn: function (s) {
+      var lines = s.split(/\r?\n/);
+      var nonEmpty = lines.filter(function (l) { return l.trim(); }).length;
+      var words = (s.match(/[\u4e00-\u9fa5]+|[A-Za-z][A-Za-z0-9_'-]*/g) || []).length;
+      var chars = Array.from(s).length;
+      var bytes = new TextEncoder().encode(s).length;
+      var minutes = Math.max(1, Math.round(chars / 350));
+      return {
+        lines: [
+          ['行数', String(lines.length)],
+          ['非空行', String(nonEmpty)],
+          ['词数', String(words)],
+          ['字符数', String(chars)],
+          ['UTF-8 字节', bytes + ' B（' + (bytes / 1024).toFixed(2) + ' KiB）'],
+          ['段落（空行分隔）', String(s.split(/\n\s*\n/).filter(function (p) { return p.trim(); }).length)],
+          ['估算阅读时长', minutes + ' 分钟']
+        ]
+      };
+    }
+  });
+
+  t2text({
+    id: 'stripzero', cat: 'text', icon: '🧽', name: '清理不可见字符',
+    desc: '清掉零宽空格、BOM、方向控制符等看不见但会捣乱的字符',
+    rows: 5, ph: '粘贴从网页复制来的文本',
+    fn: function (s) {
+      var before = Array.from(s).length;
+      var out = s.replace(/[\u200b-\u200f\u202a-\u202e\ufeff\u2060\u00ad]/g, '');
+      var removed = before - Array.from(out).length;
+      return out + (removed ? '\n\n已清理 ' + removed + ' 个不可见字符' : '\n\n没有发现不可见字符');
+    }
+  });
+
+  t2text({
+    id: 'numbering', cat: 'text', icon: '🔟', name: '加 / 去行号',
+    desc: '给每行加序号（可选补零宽度），或把开头的序号去掉',
+    rows: 5, ph: '第一行\n第二行',
+    param: { label: '动作', type: 'select', value: 'add', options: [['add', '加行号'], ['del', '去行号']] },
+    fn: function (s, mode) {
+      var lines = s.split(/\r?\n/);
+      if (mode === 'del') return lines.map(function (l) { return l.replace(/^\s*\d+[.、)\]]?\s?/, ''); }).join('\n');
+      var width = String(lines.length).length;
+      return lines.map(function (l, i) { return String(i + 1).padStart(width, '0') + '. ' + l; }).join('\n');
+    }
+  });
+
+  /* ---- time ---- */
+  t2text({
+    id: 'date2ts', cat: 'time', icon: '📅', name: '日期 ↔ 时间戳',
+    desc: '本地或 UTC 互转，输入支持 2026-10-17 23:00:00 与 ISO 8601',
+    rows: 3, ph: '2026-10-17 23:00:00',
+    param: { label: '方向', type: 'select', value: 'd2s', options: [['d2s', '日期转秒级时间戳'], ['d2ms', '日期转毫秒'], ['s2d', '秒级转日期'], ['ms2d', '毫秒转日期']] },
+    fn: function (s, mode) {
+      if (mode === 's2d' || mode === 'ms2d') {
+        var n = t2num(s);
+        var d = new Date(mode === 's2d' ? n * 1000 : n);
+        if (isNaN(d.getTime())) throw new Error('时间戳无效');
+        return '本地：' + d.toLocaleString('zh-CN', { hour12: false }) + '\nUTC：' + d.toISOString();
+      }
+      var dt = new Date(s.trim().replace(' ', 'T'));
+      if (isNaN(dt.getTime())) throw new Error('日期无效，试试 2026-10-17 23:00:00');
+      var ms = dt.getTime();
+      return mode === 'd2ms' ? String(ms) : String(Math.floor(ms / 1000));
+    }
+  });
+
+  t2text({
+    id: 'weeknum', cat: 'time', icon: '🗓️', name: 'ISO 周数',
+    desc: '按 ISO 8601 算第几周与星期几，含该周起止日期',
+    rows: 3, ph: '2026-10-17',
+    fn: function (s) {
+      var d = new Date((s.trim() || new Date().toISOString().slice(0, 10)).replace(' ', 'T'));
+      if (isNaN(d.getTime())) throw new Error('日期无效');
+      var t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+      var day = t.getUTCDay() || 7;
+      t.setUTCDate(t.getUTCDate() + 4 - day);
+      var yearStart = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+      var week = Math.ceil(((t - yearStart) / 86400000 + 1) / 7);
+      var monday = new Date(d); monday.setDate(d.getDate() - (day - 1));
+      var sunday = new Date(monday); sunday.setDate(monday.getDate() + 6);
+      var names = ['一', '二', '三', '四', '五', '六', '日'];
+      return {
+        lines: [
+          ['ISO 年', String(t.getUTCFullYear())],
+          ['ISO 周', 'W' + week],
+          ['星期', '星期' + names[day - 1]],
+          ['该周起', monday.toISOString().slice(0, 10)],
+          ['该周止', sunday.toISOString().slice(0, 10)]
+        ]
+      };
+    }
+  });
+
+  t2form({
+    id: 'dateadd', cat: 'time', icon: '➕', name: '日期加减',
+    desc: '在指定日期上加/减天数、周数或月数，给出结果与星期',
+    fields: [
+      { id: 'date', label: '起始日期', type: 'date', value: new Date().toISOString().slice(0, 10) },
+      { id: 'n', label: '数量（可为负）', type: 'number', value: 30 },
+      { id: 'unit', label: '单位', type: 'select', value: 'day', options: [['day', '天'], ['week', '周'], ['month', '个月'], ['year', '年']] }
+    ],
+    compute: function (v) {
+      var base = new Date(v.date + 'T00:00:00');
+      if (isNaN(base.getTime())) throw new Error('日期无效');
+      var n = t2int(v.n), d = new Date(base);
+      if (v.unit === 'day') d.setDate(d.getDate() + n);
+      else if (v.unit === 'week') d.setDate(d.getDate() + n * 7);
+      else if (v.unit === 'month') d.setMonth(d.getMonth() + n);
+      else d.setFullYear(d.getFullYear() + n);
+      var names = ['日', '一', '二', '三', '四', '五', '六'];
+      var diff = Math.round((d - base) / 86400000);
+      return {
+        lines: [
+          ['结果日期', d.toISOString().slice(0, 10)],
+          ['星期', '星期' + names[d.getDay()]],
+          ['相差天数', diff + ' 天'],
+          ['时间戳', String(Math.floor(d.getTime() / 1000))]
+        ]
+      };
+    }
+  });
+
+  t2form({
+    id: 'duration', cat: 'time', icon: '⏱️', name: '时长换算',
+    desc: '秒数拆成天/时/分/秒，附带毫秒、分钟与工时估算',
+    fields: [{ id: 's', label: '秒数', type: 'number', value: 93784 }],
+    compute: function (v) {
+      var total = Math.max(0, t2int(v.s));
+      var d = Math.floor(total / 86400), h = Math.floor(total % 86400 / 3600);
+      var m = Math.floor(total % 3600 / 60), s = total % 60;
+      return {
+        lines: [
+          ['拆分', (d ? d + ' 天 ' : '') + (h ? h + ' 小时 ' : '') + (m ? m + ' 分 ' : '') + s + ' 秒'],
+          ['总分钟', (total / 60).toFixed(2)],
+          ['总小时', (total / 3600).toFixed(2)],
+          ['毫秒', String(total * 1000)],
+          ['按 8 小时工作日', (total / 28800).toFixed(2) + ' 个工作日']
+        ]
+      };
+    }
+  });
+
+  t2form({
+    id: 'leapyear', cat: 'time', icon: '🌗', name: '闰年与月天数',
+    desc: '判断闰年并列出十二个月的天数，附该年总天数',
+    fields: [{ id: 'y', label: '年份', type: 'number', value: new Date().getFullYear(), min: 1, max: 9999 }],
+    compute: function (v) {
+      var y = t2int(v.y);
+      var leap = (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0;
+      var days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+      var names = ['一月', '二月', '三月', '四月', '五月', '六月', '七月', '八月', '九月', '十月', '十一月', '十二月'];
+      var lines = [['闰年', leap ? '是（' + y + ' 能被 4 整除且不被 100 整除，或能被 400 整除）' : '否']];
+      lines.push(['全年天数', String(days.reduce(function (a, b) { return a + b; }, 0))]);
+      names.forEach(function (n, i) { lines.push([n, days[i] + ' 天']); });
+      return { lines: lines };
+    }
+  });
+
+  t2form({
+    id: 'calgen', cat: 'time', icon: '📆', name: '月历生成',
+    desc: '生成指定年月的文本月历，周一起始，标注今天',
+    fields: [
+      { id: 'y', label: '年份', type: 'number', value: new Date().getFullYear() },
+      { id: 'm', label: '月份', type: 'number', value: new Date().getMonth() + 1, min: 1, max: 12 }
+    ],
+    compute: function (v) {
+      var y = t2int(v.y), m = t2int(v.m);
+      if (m < 1 || m > 12) throw new Error('月份要在 1–12 之间');
+      var first = new Date(y, m - 1, 1);
+      var startCol = (first.getDay() + 6) % 7;
+      var total = new Date(y, m, 0).getDate();
+      var today = new Date();
+      var isThisMonth = today.getFullYear() === y && today.getMonth() === m - 1;
+      var out = ['一  二  三  四  五  六  日'];
+      var row = new Array(startCol).fill('  ');
+      for (var d = 1; d <= total; d++) {
+        var cell = String(d).padStart(2, ' ');
+        if (isThisMonth && d === today.getDate()) cell = '[' + String(d).padStart(2, '0').slice(-2) + ']';
+        row.push(cell);
+        if (row.length === 7) { out.push(row.join(' ')); row = []; }
+      }
+      if (row.length) out.push(row.join(' '));
+      return out.join('\n') + '\n\n' + y + ' 年 ' + m + ' 月 · 共 ' + total + ' 天';
+    }
+  });
+
+  t2text({
+    id: 'tsbatch', cat: 'time', icon: '🔢', name: '批量时间戳',
+    desc: '每行一个时间戳，批量转成日期；十位按秒、十三位按毫秒自动识别',
+    rows: 5, ph: '1792339200\n1700000000000',
+    fn: function (s) {
+      var out = [];
+      s.split(/\r?\n/).forEach(function (l, i) {
+        var t = l.trim();
+        if (!t) return;
+        if (!/^-?\d+$/.test(t)) { out.push((i + 1) + '. 跳过（不是数字）：' + t); return; }
+        var n = Number(t);
+        var d = new Date(t.length >= 13 ? n : n * 1000);
+        if (isNaN(d.getTime())) { out.push((i + 1) + '. 无效：' + t); return; }
+        out.push((i + 1) + '. ' + d.toLocaleString('zh-CN', { hour12: false }) + '  (' + d.toISOString() + ')');
+      });
+      return out.join('\n') || '没有可转换的行';
+    }
+  });
+
+/* ==== 第二批工具（batch2b）：safe / num / calc / net / file / dev ==== */
+  /* ---- 通用小工具 ---- */
+  function b2hex(buf) {
+    return Array.from(new Uint8Array(buf)).map(function (b) { return b.toString(16).padStart(2, '0'); }).join('');
+  }
+  function b2b64(buf) {
+    var s = '';
+    new Uint8Array(buf).forEach(function (x) { s += String.fromCharCode(x); });
+    return btoa(s);
+  }
+  function b2b64url(buf) {
+    return b2b64(buf).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+  function needCrypto() {
+    if (!window.crypto || !window.crypto.subtle) throw new Error('当前环境不支持 WebCrypto（请用 https 或 localhost 打开）');
+    return window.crypto.subtle;
+  }
+  function utf8(s) { return new TextEncoder().encode(s); }
+  function nf(x, d) {
+    if (!isFinite(x)) return String(x);
+    var s = x.toFixed(d === undefined ? 6 : d);
+    return s.replace(/0+$/, '').replace(/\.$/, '');
+  }
+  function mrv(n) {
+    if (n < 2) return false;
+    var small = [2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37];
+    for (var i = 0; i < small.length; i++) {
+      if (n % small[i] === 0) return n === small[i];
+    }
+    var d = n - 1, r = 0;
+    while (d % 2 === 0) { d /= 2; r++; }
+    function powmod(a, e, m) {
+      var res = 1n, base = a % m, exp = e;
+      while (exp > 0n) {
+        if (exp & 1n) res = res * base % m;
+        base = base * base % m;
+        exp >>= 1n;
+      }
+      return res;
+    }
+    var bn = BigInt(n);
+    for (var j = 0; j < small.length; j++) {
+      var a = BigInt(small[j]);
+      var x = powmod(a, BigInt(d), bn);
+      if (x === 1n || x === bn - 1n) continue;
+      var ok = false;
+      for (var k = 1; k < r; k++) {
+        x = x * x % bn;
+        if (x === bn - 1n) { ok = true; break; }
+      }
+      if (!ok) return false;
+    }
+    return true;
+  }
+  var WORDLIST = ('alpha bravo charlie delta echo foxtrot golf hotel india juliet kilo lima mike ' +
+    'november oscar papa quebec romeo sierra tango uniform victor whiskey xray yankee zulu amber ' +
+    'basil cedar dusk ember frost glacier harbor ivory jade kernel lantern meadow nectar orbit ' +
+    'pixel quartz river summit timber umber velvet willow xenon yonder zephyr anchor basket candle ' +
+    'dagger engine feather garden helmet island jungle kettle lemon marble needle ocean pepper ' +
+    'quiver rabbit saddle tunnel umbrella violet wagon yellow zigzag bamboo cotton dolphin eagle ' +
+    'falcon galaxy horizon iron jacket kiwi lotus mirror nickel olive planet quill rocket silver ' +
+    'tiger unity vapor winter yard zebra').split(' ');
+
+  /* ---- safe ---- */
+  t2js({
+    id: 'hmac', cat: 'safe', icon: '🔐', name: 'HMAC 签名',
+    desc: '用密钥对消息做 HMAC-SHA256，输出十六进制与 base64，接口验签常用'
+  }, function (card) {
+    var msg = t2ta(3, '要签名的内容');
+    var key = t2mkParam({ label: '密钥', type: 'text', ph: 'secret' });
+    var outEl = t2out();
+    var bar = el('div', 'row');
+    var runB = el('button', 't-btn'); runB.type = 'button'; runB.textContent = '计算签名';
+    var copyB = el('button', 't-btn ghost'); copyB.type = 'button'; copyB.textContent = '复制 hex';
+    var last = '';
+    copyB.addEventListener('click', function () { copyText(last); });
+    var go = function () {
+      t2run(function () {
+        var sub = needCrypto();
+        return sub.importKey('raw', utf8(key.input.value), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'])
+          .then(function (k) { return sub.sign('HMAC', k, utf8(msg.value)); })
+          .then(function (sig) {
+            last = b2hex(sig);
+            return { lines: [['HMAC-SHA256 (hex)', last], ['base64', b2b64(sig)], ['base64url', b2b64url(sig)], ['消息字节数', String(utf8(msg.value).length)]] };
+          });
+      }, outEl, []);
+    };
+    runB.addEventListener('click', go);
+    msg.addEventListener('input', go);
+    key.input.addEventListener('input', go);
+    bar.appendChild(runB); bar.appendChild(copyB);
+    card.appendChild(msg); card.appendChild(key.wrap); card.appendChild(bar); card.appendChild(outEl);
+    go();
+  });
+
+  t2form({
+    id: 'pbkdf2', cat: 'safe', icon: '🧂', name: 'PBKDF2 派生密钥',
+    desc: '把口令派生成定长密钥（默认 SHA-256 · 32 字节），迭代次数可调',
+    fields: [
+      { id: 'pwd', label: '口令', type: 'text', value: '' },
+      { id: 'salt', label: '盐', type: 'text', value: 'xkmyth-salt' },
+      { id: 'iter', label: '迭代次数', type: 'number', value: 100000, min: 1000, max: 600000, step: 1000 },
+      { id: 'len', label: '输出字节', type: 'number', value: 32, min: 16, max: 64 }
+    ],
+    compute: function (v) {
+      var sub = needCrypto();
+      var iter = t2int(v.iter), len = t2int(v.len);
+      if (iter < 1000) throw new Error('迭代次数至少 1000');
+      return sub.importKey('raw', utf8(v.pwd), 'PBKDF2', false, ['deriveBits'])
+        .then(function (k) {
+          return sub.deriveBits({ name: 'PBKDF2', salt: utf8(v.salt), iterations: iter, hash: 'SHA-256' }, k, len * 8);
+        })
+        .then(function (bits) { return { lines: [['派生结果 (hex)', b2hex(bits)], ['base64', b2b64(bits)], ['参数', 'PBKDF2-SHA256 · ' + iter + ' 轮 · ' + len + ' 字节']] }; });
+    }
+  });
+
+  t2form({
+    id: 'totp', cat: 'safe', icon: '🔢', name: 'TOTP 验证码',
+    desc: '按 base32 密钥算 6 位动态码，附带剩余有效秒数（RFC 6238 · SHA-1）',
+    fields: [
+      { id: 'secret', label: 'base32 密钥', type: 'text', value: 'JBSWY3DPEHPK3PXP' },
+      { id: 'period', label: '周期（秒）', type: 'number', value: 30, min: 10, max: 120 },
+      { id: 'digits', label: '位数', type: 'select', value: '6', options: [['6', '6 位'], ['8', '8 位']] }
+    ],
+    compute: function (v) {
+      var sub = needCrypto();
+      var period = t2int(v.period), digits = t2int(v.digits);
+      var keyBytes;
+      try { keyBytes = b32dec(v.secret); } catch (e) { throw new Error('密钥需要是 base32：' + e.message); }
+      var raw = new Uint8Array(Array.from(keyBytes).map(function (c) { return c.charCodeAt(0); }));
+      var counter = Math.floor(Date.now() / 1000 / period);
+      var buf = new ArrayBuffer(8), view = new DataView(buf);
+      view.setUint32(4, counter % 0x100000000);
+      view.setUint32(0, Math.floor(counter / 0x100000000));
+      return sub.importKey('raw', raw, { name: 'HMAC', hash: 'SHA-1' }, false, ['sign'])
+        .then(function (k) { return sub.sign('HMAC', k, buf); })
+        .then(function (sig) {
+          var b = new Uint8Array(sig);
+          var off = b[b.length - 1] & 15;
+          var code = ((b[off] & 127) << 24 | b[off + 1] << 16 | b[off + 2] << 8 | b[off + 3]) % Math.pow(10, digits);
+          var left = period - (Math.floor(Date.now() / 1000) % period);
+          return { lines: [['当前验证码', String(code).padStart(digits, '0')], ['剩余有效', left + ' 秒'], ['计数器', String(counter)]] };
+        });
+    }
+  });
+
+  t2text({
+    id: 'passphrase', cat: 'safe', icon: '📝', name: '口令短语生成',
+    desc: '用常见英文词拼出好记的口令短语，可选分隔符与是否夹数字',
+    rows: 3, ph: '点执行生成',
+    param: { label: '词数', type: 'number', value: 4, min: 2, max: 8 },
+    fn: function (s, n) {
+      var count = t2int(n);
+      var out = [];
+      for (var i = 0; i < count; i++) out.push(WORDLIST[Math.floor(Math.random() * WORDLIST.length)]);
+      var phrase = out.join('-');
+      return phrase + '\n\n点分隔：' + out.join('.') + '\n驼峰：' + out.map(function (w) { return w[0].toUpperCase() + w.slice(1); }).join('')
+        + '\n夹数字：' + out.map(function (w) { return w + (Math.floor(Math.random() * 90) + 10); }).join('-')
+        + '\n估算熵：' + (Math.log2(WORDLIST.length) * count).toFixed(1) + ' bits（' + count + ' 词 × ' + Math.log2(WORDLIST.length).toFixed(1) + '）';
+    }
+  });
+
+  t2text({
+    id: 'entropy', cat: 'safe', icon: '📈', name: '密码熵值',
+    desc: '按字符集大小估算暴力破解所需尝试次数与耗时',
+    rows: 3, ph: '在下方输入文本…',
+    fn: function (s) {
+      var pools = [
+        ['小写字母', /[a-z]/, 26], ['大写字母', /[A-Z]/, 26], ['数字', /[0-9]/, 10],
+        ['常见符号', /[!-\/:-@\[-`{-~]/, 33], ['空格', / /, 1], ['非 ASCII', /[^\x00-\x7f]/, 94]
+      ];
+      var size = 0, used = [];
+      pools.forEach(function (p) { if (p[1].test(s)) { size += p[2]; used.push(p[0]); } });
+      if (!s) return '请输入要评估的文本';
+      var bits = Math.log2(size || 1) * Array.from(s).length;
+      var guessesPerSec = 1e10;
+      var seconds = Math.pow(2, bits) / guessesPerSec;
+      function human(sec) {
+        if (sec < 1) return '不到 1 秒';
+        var units = [[31557600, '年'], [86400, '天'], [3600, '小时'], [60, '分']];
+        for (var i = 0; i < units.length; i++) {
+          if (sec >= units[i][0]) return nf(sec / units[i][0], 1) + ' ' + units[i][1];
+        }
+        return nf(sec, 0) + ' 秒';
+      }
+      var level = bits < 28 ? '很弱' : bits < 40 ? '弱' : bits < 60 ? '一般' : bits < 80 ? '较强' : '很强';
+      return {
+        lines: [
+          ['长度', String(Array.from(s).length) + ' 个字符'],
+          ['字符集', size + '（' + used.join('、') + '）'],
+          ['熵值', nf(bits, 1) + ' bits'],
+          ['强度', level],
+          ['按 100 亿次/秒枚举', human(seconds)],
+          ['唯一字符数', String(new Set(Array.from(s)).size)]
+        ]
+      };
+    }
+  });
+
+  t2text({
+    id: 'policychk', cat: 'safe', icon: '✅', name: '密码规则检查',
+    desc: '逐条对照常见口令策略，列出不满足项与改进建议',
+    rows: 3, ph: '试一个密码看看',
+    fn: function (s) {
+      if (!s) return '请输入要检查的密码';
+      var len = Array.from(s).length;
+      var checks = [
+        ['长度 ≥ 12', len >= 12],
+        ['含小写字母', /[a-z]/.test(s)],
+        ['含大写字母', /[A-Z]/.test(s)],
+        ['含数字', /[0-9]/.test(s)],
+        ['含符号', /[!-\/:-@\[-`{-~]/.test(s)],
+        ['无连续重复', !/(.)\1{2,}/.test(s)],
+        ['无常见弱词', !/(password|admin|123456|qwerty|letmein|xkmyth)/i.test(s)],
+        ['无键盘序列', !/(qwert|asdf|zxcv|1234|abcd)/i.test(s)],
+        ['首尾非空格', s === s.trim()]
+      ];
+      var pass = checks.filter(function (c) { return c[1]; }).length;
+      var lines = checks.map(function (c) { return [(c[1] ? '✓ ' : '✗ ') + c[0], c[1] ? '通过' : '未通过']; });
+      lines.unshift(['总体', pass + '/' + checks.length + ' 项通过']);
+      return { lines: lines };
+    }
+  });
+
+  /* ---- num ---- */
+  t2text({
+    id: 'prime', cat: 'num', icon: '🧮', name: '素数判断',
+    desc: '用 Miller–Rabin 快速判定，给出邻近素数、位长与因数提示',
+    rows: 2, ph: '104729',
+    fn: function (s) {
+      var n = Number(String(s).trim());
+      if (!Number.isSafeInteger(n) || n < 1) throw new Error('请输入正整数（安全整数范围内）');
+      var isPrime = mrv(n);
+      var prev = n - 1, next = n + 1;
+      while (prev > 2 && !mrv(prev)) prev--;
+      while (!mrv(next)) next++;
+      var sqrt = Math.sqrt(n);
+      return {
+        lines: [
+          ['判定', isPrime ? '是素数' : '不是素数'],
+          ['邻近素数', (prev > 2 ? prev : '—') + ' / ' + next],
+          ['平方根', nf(sqrt, 3)],
+          ['二进制位长', n.toString(2).length + ' 位'],
+          ['试除上限', '√n ≈ ' + Math.floor(sqrt)]
+        ]
+      };
+    }
+  });
+
+  t2form({
+    id: 'gcd', cat: 'num', icon: '🔗', name: '最大公约 / 最小公倍',
+    desc: '两个整数求 gcd 与 lcm，顺带给出质因数分解',
+    fields: [
+      { id: 'a', label: '整数 A', type: 'number', value: 84 },
+      { id: 'b', label: '整数 B', type: 'number', value: 126 }
+    ],
+    compute: function (v) {
+      var a = Math.abs(t2int(v.a)), b = Math.abs(t2int(v.b));
+      if (!a || !b) throw new Error('两个数都不能为 0');
+      var x = a, y = b;
+      while (y) { var t = x % y; x = y; y = t; }
+      var gcd = x, lcm = a / gcd * b;
+      function fac(n) {
+        var out = [], d = 2;
+        while (d * d <= n) { while (n % d === 0) { out.push(d); n /= d; } d++; }
+        if (n > 1) out.push(n);
+        return out.join(' × ');
+      }
+      return {
+        lines: [
+          ['gcd', String(gcd)],
+          ['lcm', (lcm > Number.MAX_SAFE_INTEGER ? '超出安全整数范围' : String(lcm))],
+          ['A 分解', fac(a)],
+          ['B 分解', fac(b)],
+          ['互质', gcd === 1 ? '是' : '否']
+        ]
+      };
+    }
+  });
+
+  t2text({
+    id: 'factor', cat: 'num', icon: '➗', name: '质因数分解',
+    desc: '分解成质因数连乘形式，给出指数写法与约数个数',
+    rows: 2, ph: '360',
+    fn: function (s) {
+      var n = Number(String(s).trim());
+      if (!Number.isSafeInteger(n) || n < 2 || n > 1e13) throw new Error('请输入 2 到 10^13 之间的整数');
+      var m = n, map = {}, d = 2;
+      while (d * d <= m) {
+        while (m % d === 0) { map[d] = (map[d] || 0) + 1; m /= d; }
+        d += d === 2 ? 1 : 2;
+      }
+      if (m > 1) map[m] = (map[m] || 0) + 1;
+      var keys = Object.keys(map).map(Number);
+      var dividers = keys.reduce(function (acc, p) { return acc * (map[p] + 1); }, 1);
+      return {
+        lines: [
+          ['分解', keys.map(function (p) { return p; }).join(' × ') + (Object.keys(map).some(function (p) { return map[p] > 1; }) ? '' : '')],
+          ['指数写法', keys.map(function (p) { return map[p] > 1 ? p + '^' + map[p] : String(p); }).join(' × ')],
+          ['质因数个数（含重）', String(keys.reduce(function (acc, p) { return acc + map[p]; }, 0))],
+          ['不同质因数', String(keys.length)],
+          ['约数总数', String(dividers)],
+          ['本身是素数', keys.length === 1 && map[n] === 1 ? '是' : '否']
+        ]
+      };
+    }
+  });
+
+  t2text({
+    id: 'roman', cat: 'num', icon: '🏛️', name: '罗马数字',
+    desc: '1–3999 的整数与罗马数字互转，自动识别方向',
+    rows: 2, ph: '2026 或 MMXXVI',
+    fn: function (s) {
+      var t = s.trim().toUpperCase();
+      if (/^\d+$/.test(t)) {
+        var n = Number(t);
+        if (n < 1 || n > 3999) throw new Error('只支持 1–3999');
+        var map = [[1000, 'M'], [900, 'CM'], [500, 'D'], [400, 'CD'], [100, 'C'], [90, 'XC'],
+          [50, 'L'], [40, 'XL'], [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I']];
+        var out = '';
+        map.forEach(function (p) { while (n >= p[0]) { out += p[1]; n -= p[0]; } });
+        return out;
+      }
+      if (!/^[IVXLCDM]+$/.test(t)) throw new Error('既不是整数也不是罗马数字');
+      var vals = { I: 1, V: 5, X: 10, L: 50, C: 100, D: 500, M: 1000 };
+      var total = 0;
+      for (var i = 0; i < t.length; i++) {
+        var cur = vals[t[i]], next = vals[t[i + 1]];
+        total += next && next > cur ? -cur : cur;
+      }
+      if (total < 1 || total > 3999) throw new Error('超出 1–3999');
+      return String(total);
+    }
+  });
+
+  t2text({
+    id: 'numwords', cat: 'num', icon: '🔊', name: '数字转读法',
+    desc: '整数转中文或英文读法，处理万/亿与进位',
+    rows: 2, ph: '10086',
+    param: { label: '语言', type: 'select', value: 'zh', options: [['zh', '中文'], ['en', '英文']] },
+    fn: function (s, lang) {
+      var n = Number(String(s).trim().replace(/,/g, ''));
+      if (!Number.isSafeInteger(n)) throw new Error('请输入安全整数范围内的整数');
+      if (lang === 'en') {
+        var ones = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten',
+          'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen'];
+        var tens = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'];
+        var scales = ['', 'thousand', 'million', 'billion', 'trillion'];
+        if (n < 0) return 'minus ' + String(Math.abs(n));
+        if (n < 20) return ones[n];
+        var parts = [], groups = String(n).match(/\d{1,3}(?=(\d{3})*$)/g) || [];
+        groups.forEach(function (g, idx) {
+          var val = Number(g), words = [];
+          if (val >= 100) { words.push(ones[Math.floor(val / 100)], 'hundred'); val %= 100; }
+          if (val >= 20) { words.push(tens[Math.floor(val / 10)]); val %= 10; }
+          if (val) words.push(ones[val]);
+          if (words.length && scales[groups.length - 1 - idx]) words.push(scales[groups.length - 1 - idx]);
+          if (words.length) parts.push(words.join(' '));
+        });
+        return parts.join(' ');
+      }
+      var zh = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
+      var units = ['', '十', '百', '千'];
+      var big = ['', '万', '亿', '万亿'];
+      var neg = n < 0;
+      var str = String(Math.abs(n));
+      var groups2 = [];
+      while (str.length > 4) { groups2.unshift(str.slice(-4)); str = str.slice(0, -4); }
+      groups2.unshift(str);
+      var res = groups2.map(function (g, gi) {
+        var out2 = '', zero = false, len = g.length;
+        for (var i = 0; i < len; i++) {
+          var dg = Number(g[i]);
+          var pos = len - 1 - i;
+          if (dg === 0) { zero = true; }
+          else {
+            if (zero && out2) out2 += '零';
+            zero = false;
+            out2 += zh[dg] + units[pos];
+          }
+        }
+        var unit = big[groups2.length - 1 - gi];
+        if (!out2) return unit ? '零' : '';
+        if (unit && out2 === '一十' && gi === groups2.length - 1) out2 = '十';
+        return out2 + unit;
+      }).join('').replace(/零+/g, '零').replace(/零$/, '');
+      return (neg ? '负' : '') + res;
+    }
+  });
+
+  t2text({
+    id: 'scinot', cat: 'num', icon: '🔬', name: '科学计数法',
+    desc: '普通数字与 a × 10^b 形式互转，也能解析 1e-6 与 2.5E+3',
+    rows: 2, ph: '123456789 或 1.23456789e8',
+    param: { label: '方向', type: 'select', value: 'auto', options: [['auto', '自动'], ['to', '转科学计数'], ['from', '还原普通数字']] },
+    fn: function (s, mode) {
+      var t = s.trim();
+      if (mode === 'from' || (mode === 'auto' && /[eE]/.test(t))) {
+        var v = Number(t);
+        if (!isFinite(v)) throw new Error('无法解析');
+        return String(v);
+      }
+      var n = Number(t.replace(/[,\s]/g, ''));
+      if (!isFinite(n)) throw new Error('无法解析');
+      if (n === 0) return '0';
+      var exp = Math.floor(Math.log10(Math.abs(n)));
+      var mant = n / Math.pow(10, exp);
+      return { lines: [['科学计数', nf(mant, 10) + ' × 10^' + exp], ['程序员写法', nf(mant, 10) + 'e' + exp], ['有效数字', String(nf(mant, 10).replace(/[^0-9]/g, '').length)]] };
+    }
+  });
+
+  t2text({
+    id: 'popcount', cat: 'num', icon: '🧷', name: '二进制与位运算',
+    desc: '把整数拆成 32 位视图，给出 1 的个数、位移与常用掩码结果',
+    rows: 2, ph: '42',
+    param: { label: '操作', type: 'select', value: 'view', options: [['view', '查看'], ['shl', '左移 1 位'], ['shr', '右移 1 位'], ['not', '按位取反'], ['xor', '与 0xFF 异或']] },
+    fn: function (s, op) {
+      var n = Number(String(s).trim());
+      if (!Number.isSafeInteger(n)) throw new Error('请输入整数');
+      var u = n >>> 0;
+      var bin = u.toString(2).padStart(32, '0');
+      var res = { shl: (n << 1) | 0, shr: n >> 1, not: ~n, xor: (n ^ 0xFF) | 0 }[op];
+      var lines = [
+        ['二进制 (32 位)', bin.match(/.{8}/g).join(' ')],
+        ['十六进制', '0x' + u.toString(16).toUpperCase()],
+        ['1 的个数', bin.split('').filter(function (c) { return c === '1'; }).length + ' 位'],
+        ['最高位位置', bin.indexOf('1') < 0 ? '无' : String(31 - bin.indexOf('1'))]
+      ];
+      if (op !== 'view') lines.push([op.toUpperCase() + ' 结果', String(res) + '（0x' + (res >>> 0).toString(16).toUpperCase() + '）']);
+      return { lines: lines };
+    }
+  });
+
+  t2form({
+    id: 'roundto', cat: 'num', icon: '🔄', name: '四舍五入与取整',
+    desc: '按指定小数位与规则取整，直观看到四种取整方式的差别',
+    fields: [
+      { id: 'v', label: '数值', type: 'number', value: 12.3456, step: 'any' },
+      { id: 'd', label: '小数位', type: 'number', value: 2, min: 0, max: 10 },
+      { id: 'm', label: '规则', type: 'select', value: 'half', options: [['half', '四舍五入'], ['floor', '向下取整'], ['ceil', '向上取整'], ['trunc', '截断']] }
+    ],
+    compute: function (v) {
+      var n = t2num(v.v), d = t2int(v.d);
+      var k = Math.pow(10, d);
+      var out;
+      if (v.m === 'floor') out = Math.floor(n * k) / k;
+      else if (v.m === 'ceil') out = Math.ceil(n * k) / k;
+      else if (v.m === 'trunc') out = (n < 0 ? Math.ceil(n * k) : Math.floor(n * k)) / k;
+      else out = Math.round(n * k) / k;
+      return {
+        lines: [
+          ['结果', out.toFixed(d)],
+          ['整数部分', String(Math.trunc(n))],
+          ['小数部分', nf(n - Math.trunc(n), 8)],
+          ['绝对值', nf(Math.abs(n), 8)],
+          ['附近整数', [Math.floor(n), Math.ceil(n)].join(' / ')]
+        ]
+      };
+    }
+  });
+
+  t2text({
+    id: 'frac', cat: 'num', icon: '½', name: '小数转分数',
+    desc: '用连分数找出最佳分数近似，给出最简形式与误差',
+    rows: 2, ph: '0.618',
+    fn: function (s) {
+      var x = Number(String(s).trim());
+      if (!isFinite(x)) throw new Error('请输入数字');
+      var sign = x < 0 ? -1 : 1, v = Math.abs(x);
+      var h1 = 1, h2 = 0, k1 = 0, k2 = 1, b = v, best = null;
+      for (var i = 0; i < 40; i++) {
+        var a = Math.floor(b);
+        var h = a * h1 + h2, k = a * k1 + k2;
+        if (k > 1e7) break;
+        best = [h, k];
+        h2 = h1; h1 = h; k2 = k1; k1 = k;
+        var frac = b - a;
+        if (frac < 1e-12) break;
+        b = 1 / frac;
+      }
+      var num = sign * best[0], den = best[1];
+      function gcd(a, c) { while (c) { var t = a % c; a = c; c = t; } return a; }
+      var finalGcd = gcd(Math.abs(num), den);
+      if (finalGcd > 1) { num /= finalGcd; den /= finalGcd; }
+      return {
+        lines: [
+          ['分数', num + '/' + den],
+          ['带分数', Math.abs(num) >= den ? (sign * Math.trunc(num / den)) + ' ' + (Math.abs(num) % den) + '/' + den : '—'],
+          ['小数', nf(v * sign, 10)],
+          ['误差', (Math.abs(v * sign - num / den)).toExponential(3)],
+          ['百分比', nf(v * 100, 6) + '%']
+        ]
+      };
+    }
+  });
+
+  t2text({
+    id: 'ratio', cat: 'num', icon: '⚖️', name: '比例化简',
+    desc: '两数比化简为最简整数比，同时给出小数与百分比',
+    rows: 2, ph: '16:9 或 16 9',
+    fn: function (s) {
+      var parts = s.trim().split(/[:\s,，]+/).filter(Boolean).map(Number);
+      if (parts.length !== 2 || parts.some(function (p) { return !isFinite(p); })) throw new Error('写成 a:b，例如 16:9');
+      var a = parts[0], b = parts[1];
+      if (a === 0 && b === 0) throw new Error('两个数不能都是 0');
+      var g = (function gcd(x, y) { x = Math.abs(x); y = Math.abs(y); while (y) { var t = x % y; x = y; y = t; } return x || 1; })(a, b);
+      var total = a + b;
+      return {
+        lines: [
+          ['最简比', nf(a / g, 6) + ' : ' + nf(b / g, 6)],
+          ['小数倍数', nf(a / b, 6) + ' 倍'],
+          ['占比', nf(a / total * 100, 4) + '% : ' + nf(b / total * 100, 4) + '%'],
+          ['公约数', String(g)]
+        ]
+      };
+    }
+  });
+
+  t2form({
+    id: 'modpow', cat: 'num', icon: '🔢', name: '模幂运算',
+    desc: '用 BigInt 快速算 a^b mod m，加密与哈希算法的核心步骤',
+    fields: [
+      { id: 'a', label: '底数 a', type: 'text', value: '3' },
+      { id: 'b', label: '指数 b', type: 'text', value: '1000' },
+      { id: 'm', label: '模 m', type: 'text', value: '1000000007' }
+    ],
+    compute: function (v) {
+      function bi(x, name) {
+        try { return BigInt(String(x).trim()); } catch (e) { throw new Error(name + ' 需要整数'); }
+      }
+      var a = bi(v.a, '底数'), b = bi(v.b, '指数'), m = bi(v.m, '模');
+      if (m <= 0n) throw new Error('模必须为正');
+      var base = ((a % m) + m) % m, exp = b, res = 1n;
+      if (exp < 0n) throw new Error('负指数请先求逆元');
+      while (exp > 0n) {
+        if (exp & 1n) res = res * base % m;
+        base = base * base % m;
+        exp >>= 1n;
+      }
+      return { lines: [['结果', res.toString()], ['验算', 'a^b mod m，位长 ' + res.toString(2).length + ' 位'], ['模', m.toString()]] };
+    }
+  });
+
+  t2text({
+    id: 'floatfmt', cat: 'num', icon: '🌊', name: '浮点精度观察',
+    desc: '看 0.1+0.2 这类误差的真实值，以及各精度格式化结果',
+    rows: 2, ph: '0.1+0.2',
+    fn: function (s) {
+      var expr = s.trim().replace(/[^-0-9+*/().eE\s]/g, '');
+      if (!expr) expr = '0.1+0.2';
+      var val;
+      try { val = Function('return (' + expr + ')')(); } catch (e) { throw new Error('表达式无法计算'); }
+      if (typeof val !== 'number') throw new Error('结果不是数字');
+      var lines = [
+        ['表达式', expr],
+        ['原始值', String(val)],
+        ['toFixed(2)', val.toFixed(2)],
+        ['toPrecision(15)', Number(val).toPrecision(15)],
+        ['JSON', JSON.stringify(val)],
+        ['二进制', (function (f) {
+          var buf = new DataView(new ArrayBuffer(8));
+          buf.setFloat64(0, f);
+          return Array.from(new Uint8Array(buf.buffer)).map(function (b) { return b.toString(16).padStart(2, '0'); }).join(' ');
+        })(val)],
+        ['是否安全整数', Number.isSafeInteger(val) ? '是' : '否']
+      ];
+      return { lines: lines };
+    }
+  });
+
+  /* ---- calc ---- */
+  t2form({
+    id: 'percent', cat: 'calc', icon: '％', name: '百分比计算',
+    desc: '三种最常见的百分比问法：占比、按比例取数、增减率',
+    fields: [
+      { id: 'a', label: '数值 / 原值', type: 'number', value: 80, step: 'any' },
+      { id: 'b', label: '总量 / 新值', type: 'number', value: 200, step: 'any' },
+      { id: 'mode', label: '问法', type: 'select', value: 'ratio', options: [['ratio', 'A 是 B 的百分之几'], ['of', 'B 的 A% 是多少'], ['change', '从 A 到 B 的变化率']] }
+    ],
+    compute: function (v) {
+      var a = t2num(v.a), b = t2num(v.b);
+      if (v.mode === 'ratio') {
+        if (!b) throw new Error('总量不能为 0');
+        return { lines: [['占比', nf(a / b * 100, 4) + '%'], ['小数', nf(a / b, 6)], ['剩余', nf((b - a) / b * 100, 4) + '%']] };
+      }
+      if (v.mode === 'of') return { lines: [['结果', nf(b * a / 100, 6)], ['原数 + 该比例', nf(b * (1 + a / 100), 6)], ['原数 − 该比例', nf(b * (1 - a / 100), 6)]] };
+      if (!a) throw new Error('原值不能为 0');
+      return { lines: [['变化率', nf((b - a) / a * 100, 4) + '%'], ['倍数', nf(b / a, 6) + ' 倍'], ['差值', nf(b - a, 6)]] };
+    }
+  });
+
+  t2form({
+    id: 'tip', cat: 'calc', icon: '🍽️', name: '小费与分账',
+    desc: '按账单、小费比例与人数算出总价与每人应付',
+    fields: [
+      { id: 'bill', label: '账单金额', type: 'number', value: 268, step: 'any' },
+      { id: 'pct', label: '小费比例 (%)', type: 'number', value: 12, step: 'any' },
+      { id: 'people', label: '人数', type: 'number', value: 4, min: 1 }
+    ],
+    compute: function (v) {
+      var bill = t2num(v.bill), pct = t2num(v.pct), people = Math.max(1, t2int(v.people));
+      var tip = bill * pct / 100, total = bill + tip;
+      return {
+        lines: [
+          ['小费', nf(tip, 2) + ' 元'],
+          ['总计', nf(total, 2) + ' 元'],
+          ['每人', nf(total / people, 2) + ' 元'],
+          ['每人（只算小费）', nf(tip / people, 2) + ' 元']
+        ]
+      };
+    }
+  });
+
+  t2form({
+    id: 'discount', cat: 'calc', icon: '🏷️', name: '折扣计算',
+    desc: '折后价、优惠额与等效折扣率，支持先打折再满减',
+    fields: [
+      { id: 'price', label: '原价', type: 'number', value: 599, step: 'any' },
+      { id: 'off', label: '折扣 (折)', type: 'number', value: 7.5, step: 'any' },
+      { id: 'cut', label: '额外满减', type: 'number', value: 50, step: 'any' }
+    ],
+    compute: function (v) {
+      var price = t2num(v.price), off = t2num(v.off), cut = t2num(v.cut);
+      if (off <= 0 || off > 10) throw new Error('折扣在 0–10 之间，例如 7.5 折');
+      var afterOff = price * off / 10, final = Math.max(0, afterOff - cut);
+      return {
+        lines: [
+          ['折后价', nf(afterOff, 2) + ' 元'],
+          ['再满减后', nf(final, 2) + ' 元'],
+          ['共省', nf(price - final, 2) + ' 元'],
+          ['等效折扣', nf(final / price * 10, 3) + ' 折'],
+          ['等效降价', nf((1 - final / price) * 100, 2) + '%']
+        ]
+      };
+    }
+  });
+
+  t2text({
+    id: 'avg', cat: 'calc', icon: '📊', name: '平均数与总和',
+    desc: '一行一个数字，给出总和、均值、极值与超出均值的数据',
+    rows: 6, ph: '12\n18\n9\n30',
+    fn: function (s) {
+      var nums = s.split(/[\s,，]+/).filter(Boolean).map(Number);
+      if (!nums.length || nums.some(function (n) { return !isFinite(n); })) throw new Error('每行一个数字');
+      var sum = nums.reduce(function (a, b) { return a + b; }, 0);
+      var avg = sum / nums.length;
+      return {
+        lines: [
+          ['个数', String(nums.length)],
+          ['总和', nf(sum, 6)],
+          ['平均值', nf(avg, 6)],
+          ['最小值', nf(Math.min.apply(null, nums), 6)],
+          ['最大值', nf(Math.max.apply(null, nums), 6)],
+          ['高于均值', nums.filter(function (n) { return n > avg; }).length + ' 个']
+        ]
+      };
+    }
+  });
+
+  t2text({
+    id: 'median', cat: 'calc', icon: '📐', name: '中位数与分位',
+    desc: '排序后取中位数、四分位与 P90，判断分布是否偏斜',
+    rows: 6, ph: '1\n2\n3\n4\n100',
+    fn: function (s) {
+      var nums = s.split(/[\s,，]+/).filter(Boolean).map(Number).sort(function (a, b) { return a - b; });
+      if (!nums.length) throw new Error('请输入数字');
+      function q(p) {
+        var pos = (nums.length - 1) * p, lo = Math.floor(pos), hi = Math.ceil(pos);
+        return nums[lo] + (nums[hi] - nums[lo]) * (pos - lo);
+      }
+      var avg = nums.reduce(function (a, b) { return a + b; }, 0) / nums.length;
+      return {
+        lines: [
+          ['中位数', nf(q(0.5), 6)],
+          ['Q1', nf(q(0.25), 6)],
+          ['Q3', nf(q(0.75), 6)],
+          ['P90', nf(q(0.9), 6)],
+          ['均值', nf(avg, 6)],
+          ['偏斜提示', q(0.5) > avg ? '中位数大于均值，可能右偏或有小值拖尾' : q(0.5) < avg ? '中位数小于均值，可能左偏或有大值拖尾' : '基本对称']
+        ]
+      };
+    }
+  });
+
+  t2text({
+    id: 'stddev', cat: 'calc', icon: '📉', name: '方差与标准差',
+    desc: '同时给出总体与样本标准差，附变异系数',
+    rows: 6, ph: '2\n4\n4\n4\n5\n5\n7\n9',
+    fn: function (s) {
+      var nums = s.split(/[\s,，]+/).filter(Boolean).map(Number);
+      if (nums.length < 2) throw new Error('至少两个数字');
+      var n = nums.length;
+      var mean = nums.reduce(function (a, b) { return a + b; }, 0) / n;
+      var sq = nums.reduce(function (a, b) { return a + (b - mean) * (b - mean); }, 0);
+      var popVar = sq / n, sVar = sq / (n - 1);
+      return {
+        lines: [
+          ['均值', nf(mean, 6)],
+          ['总体方差', nf(popVar, 6)],
+          ['总体标准差', nf(Math.sqrt(popVar), 6)],
+          ['样本方差', nf(sVar, 6)],
+          ['样本标准差', nf(Math.sqrt(sVar), 6)],
+          ['变异系数', nf(Math.sqrt(sVar) / mean * 100, 4) + '%']
+        ]
+      };
+    }
+  });
+
+  t2form({
+    id: 'compound', cat: 'calc', icon: '📈', name: '复利计算',
+    desc: '本金、年利率、年限与复利频率，算出终值与利息',
+    fields: [
+      { id: 'p', label: '本金', type: 'number', value: 10000, step: 'any' },
+      { id: 'r', label: '年利率 (%)', type: 'number', value: 3.5, step: 'any' },
+      { id: 'y', label: '年限', type: 'number', value: 10, step: 'any' },
+      { id: 'f', label: '复利频率', type: 'select', value: '12', options: [['1', '每年'], ['4', '每季'], ['12', '每月'], ['365', '每天']] }
+    ],
+    compute: function (v) {
+      var p = t2num(v.p), r = t2num(v.r) / 100, y = t2num(v.y), f = t2int(v.f);
+      var amount = p * Math.pow(1 + r / f, f * y);
+      var simple = p * (1 + r * y);
+      return {
+        lines: [
+          ['终值（复利）', nf(amount, 2)],
+          ['利息', nf(amount - p, 2)],
+          ['单利对照', nf(simple, 2)],
+          ['复利多出', nf(amount - simple, 2)],
+          ['有效年利率', nf((Math.pow(1 + r / f, f) - 1) * 100, 4) + '%'],
+          ['翻倍约需', r > 0 ? nf(Math.log(2) / Math.log(1 + r) , 2) + ' 年（按年复利）' : '—']
+        ]
+      };
+    }
+  });
+
+  t2form({
+    id: 'loanrate', cat: 'calc', icon: '🏦', name: '等额本息贷款',
+    desc: '按月供公式算月供、总利息与还款总额，可对比不同年限',
+    fields: [
+      { id: 'amount', label: '贷款金额', type: 'number', value: 500000, step: 'any' },
+      { id: 'rate', label: '年利率 (%)', type: 'number', value: 4.2, step: 'any' },
+      { id: 'years', label: '年限', type: 'number', value: 20, min: 1, max: 40 }
+    ],
+    compute: function (v) {
+      var amount = t2num(v.amount), rate = t2num(v.rate) / 100 / 12, months = t2int(v.years) * 12;
+      var monthly = rate === 0 ? amount / months : amount * rate * Math.pow(1 + rate, months) / (Math.pow(1 + rate, months) - 1);
+      var total = monthly * months;
+      var first = amount * rate + (amount - 0) * 0 ;
+      return {
+        lines: [
+          ['月供', nf(monthly, 2)],
+          ['还款总额', nf(total, 2)],
+          ['总利息', nf(total - amount, 2)],
+          ['利息占比', nf((total - amount) / amount * 100, 2) + '%'],
+          ['期数', months + ' 期'],
+          ['首月利息', nf(first, 2)]
+        ]
+      };
+    }
+  });
+
+  t2form({
+    id: 'profit', cat: 'calc', icon: '💹', name: '利润率与加价',
+    desc: '成本售价之间的利润、利润率与加价率换算，避免两个概念混用',
+    fields: [
+      { id: 'cost', label: '成本', type: 'number', value: 65, step: 'any' },
+      { id: 'price', label: '售价', type: 'number', value: 99, step: 'any' }
+    ],
+    compute: function (v) {
+      var cost = t2num(v.cost), price = t2num(v.price);
+      var profit = price - cost;
+      return {
+        lines: [
+          ['利润', nf(profit, 2)],
+          ['利润率（占售价）', nf(profit / price * 100, 2) + '%'],
+          ['加价率（占成本）', nf(profit / cost * 100, 2) + '%'],
+          ['毛利率', nf((price - cost) / price * 100, 2) + '%'],
+          ['保本售价', nf(cost, 2)],
+          ['售价是成本的', nf(price / cost, 4) + ' 倍']
+        ]
+      };
+    }
+  });
+
+  t2form({
+    id: 'unitcost', cat: 'calc', icon: '🧾', name: '单位价格比较',
+    desc: '两个包装的价格与规格比出每单位价格，告诉你哪个划算',
+    fields: [
+      { id: 'p1', label: 'A 价格', type: 'number', value: 39.9, step: 'any' },
+      { id: 's1', label: 'A 规格（克/毫升/个）', type: 'number', value: 500, step: 'any' },
+      { id: 'p2', label: 'B 价格', type: 'number', value: 59.9, step: 'any' },
+      { id: 's2', label: 'B 规格（克/毫升/个）', type: 'number', value: 800, step: 'any' }
+    ],
+    compute: function (v) {
+      var p1 = t2num(v.p1), s1 = t2num(v.s1), p2 = t2num(v.p2), s2 = t2num(v.s2);
+      if (!s1 || !s2) throw new Error('规格不能为 0');
+      var u1 = p1 / s1, u2 = p2 / s2;
+      var diff = Math.abs(u1 - u2) / Math.max(u1, u2) * 100;
+      return {
+        lines: [
+          ['A 单位价', nf(u1, 4) + ' / 单位'],
+          ['B 单位价', nf(u2, 4) + ' / 单位'],
+          ['更划算', u1 < u2 ? 'A（省 ' + nf(diff, 2) + '%）' : u2 < u1 ? 'B（省 ' + nf(diff, 2) + '%）' : '两者相同'],
+          ['按 A 单位价买 B 规格应花', nf(u1 * s2, 2)],
+          ['按 B 单位价买 A 规格应花', nf(u2 * s1, 2)]
+        ]
+      };
+    }
+  });
+
+  t2form({
+    id: 'rent', cat: 'calc', icon: '🏠', name: '房租水电分摊',
+    desc: '按房间面积或人数分摊房租与水电，给出每人明细',
+    fields: [
+      { id: 'rent', label: '房租总额', type: 'number', value: 4500, step: 'any' },
+      { id: 'util', label: '水电杂费', type: 'number', value: 320, step: 'any' },
+      { id: 'people', label: '合租人数', type: 'number', value: 3, min: 1 },
+      { id: 'mode', label: '分摊方式', type: 'select', value: 'avg', options: [['avg', '平均'], ['room', '按房间面积（大房加价）']] }
+    ],
+    compute: function (v) {
+      var rent = t2num(v.rent), util = t2num(v.util), n = Math.max(1, t2int(v.people));
+      if (v.mode === 'room' && n > 1) {
+        var weightBig = 1.3, small = n - 1;
+        var unit = rent / (weightBig + small);
+        return {
+          lines: [
+            ['大房', nf(unit * weightBig + util / n, 2)],
+            ['其余每间', nf(unit + util / n, 2)],
+            ['水电每人', nf(util / n, 2)],
+            ['权重', '大房 ×1.3，其余 ×1.0']
+          ]
+        };
+      }
+      return {
+        lines: [
+          ['每人房租', nf(rent / n, 2)],
+          ['每人水电', nf(util / n, 2)],
+          ['每人合计', nf((rent + util) / n, 2)],
+          ['总计', nf(rent + util, 2)]
+        ]
+      };
+    }
+  });
+
+  t2form({
+    id: 'calorie', cat: 'calc', icon: '🍎', name: '每日热量估算',
+    desc: 'Mifflin–St Jeor 公式算基础代谢，乘活动系数得到每日消耗',
+    fields: [
+      { id: 'sex', label: '性别', type: 'select', value: 'm', options: [['m', '男'], ['f', '女']] },
+      { id: 'age', label: '年龄', type: 'number', value: 28, min: 10, max: 100 },
+      { id: 'h', label: '身高 (cm)', type: 'number', value: 175 },
+      { id: 'w', label: '体重 (kg)', type: 'number', value: 68, step: 'any' },
+      { id: 'act', label: '活动量', type: 'select', value: '1.375', options: [['1.2', '久坐'], ['1.375', '轻度'], ['1.55', '中度'], ['1.725', '高强度']] }
+    ],
+    compute: function (v) {
+      var age = t2num(v.age), h = t2num(v.h), w = t2num(v.w), act = t2num(v.act);
+      var bmr = 10 * w + 6.25 * h - 5 * age + (v.sex === 'm' ? 5 : -161);
+      var tdee = bmr * act;
+      return {
+        lines: [
+          ['基础代谢 BMR', nf(bmr, 0) + ' kcal/天'],
+          ['每日总消耗 TDEE', nf(tdee, 0) + ' kcal/天'],
+          ['减脂建议', nf(tdee - 400, 0) + ' kcal/天（约 -0.4 kg/周）'],
+          ['增肌建议', nf(tdee + 300, 0) + ' kcal/天'],
+          ['BMI', nf(w / Math.pow(h / 100, 2), 1)]
+        ]
+      };
+    }
+  });
+
+  /* ---- net ---- */
+  t2text({
+    id: 'ipv4conv', cat: 'net', icon: '🌐', name: 'IPv4 ↔ 整数',
+    desc: '点分十进制与 32 位整数互转，顺带给出二进制与反向域名写法',
+    rows: 2, ph: '192.168.1.1 或 3232235777',
+    param: { label: '方向', type: 'select', value: 'auto', options: [['auto', '自动'], ['to', 'IP 转整数'], ['from', '整数转 IP']] },
+    fn: function (s, dir) {
+      var t = s.trim();
+      if (/^\d+$/.test(t) && dir !== 'to') {
+        var n = Number(t);
+        if (n > 4294967295) throw new Error('超出 32 位范围');
+        var oct = [(n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 255];
+        return { lines: [['IP', oct.join('.')], ['反向域名', oct.slice().reverse().join('.') + '.in-addr.arpa'], ['二进制', n.toString(2).padStart(32, '0')]] };
+      }
+      var m = t.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+      if (!m) throw new Error('格式应为 a.b.c.d');
+      var parts = [Number(m[1]), Number(m[2]), Number(m[3]), Number(m[4])];
+      if (parts.some(function (p) { return p > 255; })) throw new Error('每段要在 0–255');
+      var intVal = ((parts[0] << 24) | (parts[1] << 16) | (parts[2] << 8) | parts[3]) >>> 0;
+      return { lines: [['整数', String(intVal)], ['十六进制', '0x' + intVal.toString(16).toUpperCase()], ['二进制', intVal.toString(2).padStart(32, '0')], ['反向域名', parts.slice().reverse().join('.') + '.in-addr.arpa']] };
+    }
+  });
+
+  t2text({
+    id: 'ipv6expand', cat: 'net', icon: '🌍', name: 'IPv6 展开 / 压缩',
+    desc: '补全省略的零段或压回最短写法，自动识别方向',
+    rows: 2, ph: '2001:db8::1',
+    param: { label: '方向', type: 'select', value: 'expand', options: [['expand', '展开'], ['compress', '压缩']] },
+    fn: function (s, dir) {
+      var t = s.trim().toLowerCase();
+      if (!/^[0-9a-f:]+$/.test(t)) throw new Error('含非法字符');
+      var groups;
+      if (dir === 'expand') {
+        if (t.indexOf('::') >= 0) {
+          var halves = t.split('::');
+          if (halves.length > 2) throw new Error('最多一个 ::');
+          var left = halves[0] ? halves[0].split(':') : [];
+          var right = halves[1] ? halves[1].split(':') : [];
+          var fill = 8 - left.length - right.length;
+          if (fill < 0) throw new Error('段数超过 8');
+          groups = left.concat(new Array(fill).fill('0'), right);
+        } else groups = t.split(':');
+        if (groups.length !== 8) throw new Error('段数为 ' + groups.length + '，应为 8');
+        return groups.map(function (g) { return g.padStart(4, '0'); }).join(':');
+      }
+      var exp = t;
+      if (t.indexOf('::') < 0) {
+        var gs = t.split(':');
+        if (gs.length !== 8) throw new Error('请先展开成 8 段');
+        exp = gs.map(function (g) { return g.padStart(4, '0'); }).join(':');
+      } else {
+        exp = (function () {
+          var halves = t.split('::');
+          var left = halves[0] ? halves[0].split(':') : [];
+          var right = halves[1] ? halves[1].split(':') : [];
+          var fill = 8 - left.length - right.length;
+          return left.concat(new Array(Math.max(0, fill)).fill('0'), right)
+            .map(function (g) { return g.padStart(4, '0'); }).join(':');
+        })();
+      }
+      var parts = exp.split(':');
+      var best = { start: -1, len: 0 }, i = 0;
+      while (i < 8) {
+        if (parts[i] === '0000') {
+          var j = i;
+          while (j < 8 && parts[j] === '0000') j++;
+          if (j - i > best.len) best = { start: i, len: j - i };
+          i = j;
+        } else i++;
+      }
+      var head = parts.slice(0, best.start < 0 ? 8 : best.start).map(function (g) { return g.replace(/^0+(?=.)/, ''); });
+      if (best.start < 0) return head.join(':');
+      var tail = parts.slice(best.start + best.len).map(function (g) { return g.replace(/^0+(?=.)/, ''); });
+      return head.join(':') + '::' + tail.join(':');
+    }
+  });
+
+  t2text({
+    id: 'macfmt', cat: 'net', icon: '🖧', name: 'MAC 地址格式化',
+    desc: '统一成冒号、横线、点分或 Cisco 写法，识别单播与本地管理位',
+    rows: 2, ph: '00:1A:2B:3C:4D:5E',
+    fn: function (s) {
+      var hex = s.replace(/[^0-9a-fA-F]/g, '').toLowerCase();
+      if (hex.length !== 12) throw new Error('需要 12 个十六进制字符，当前 ' + hex.length);
+      var pairs = hex.match(/.{2}/g);
+      var first = parseInt(hex.slice(0, 2), 16);
+      return {
+        lines: [
+          ['冒号', pairs.join(':')],
+          ['横线', pairs.join('-')],
+          ['点分', hex.match(/.{4}/g).join('.')],
+          ['Cisco', hex.match(/.{4}/g).join('.')],
+          ['无分隔', hex],
+          ['单播/组播', first & 1 ? '组播' : '单播'],
+          ['本地管理', first & 2 ? '是（本地分配）' : '否（厂商分配）']
+        ]
+      };
+    }
+  });
+
+  t2form({
+    id: 'iprange', cat: 'net', icon: '📶', name: 'IP 连续范围',
+    desc: '从起始地址加数量算出结束地址，便于批量登记或核对网段',
+    fields: [
+      { id: 'ip', label: '起始 IP', type: 'text', value: '192.168.1.10' },
+      { id: 'n', label: '数量', type: 'number', value: 20, min: 1 }
+    ],
+    compute: function (v) {
+      var m = String(v.ip).trim().match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+      if (!m) throw new Error('IP 格式不对');
+      var parts = [Number(m[1]), Number(m[2]), Number(m[3]), Number(m[4])];
+      if (parts.some(function (p) { return p > 255; })) throw new Error('每段 0–255');
+      var start = ((parts[0] << 24) | (parts[1] << 16) | (parts[2] << 8) | parts[3]) >>> 0;
+      var count = t2int(v.n);
+      var end = start + count - 1;
+      if (end > 4294967295) throw new Error('范围越界');
+      function toIp(n) { return [(n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 255].join('.'); }
+      return {
+        lines: [
+          ['起始', toIp(start)],
+          ['结束', toIp(end)],
+          ['数量', count + ' 个'],
+          ['整数区间', start + ' – ' + end],
+          ['对齐 /24', Math.floor(start / 256) === Math.floor(end / 256) ? '是（同一 /24 内）' : '否（跨 /24）']
+        ]
+      };
+    }
+  });
+
+  t2text({
+    id: 'privateip', cat: 'net', icon: '🏠', name: '内网地址判断',
+    desc: '判断 IPv4/IPv6 是否属于私有、保留、回环或运营商级 NAT 段',
+    rows: 2, ph: '10.0.0.8',
+    fn: function (s) {
+      var t = s.trim();
+      var v4 = t.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+      if (v4) {
+        var a = Number(v4[1]), b = Number(v4[2]), c = Number(v4[3]);
+        var rules = [
+          ['回环 127/8', a === 127], ['A 类私有 10/8', a === 10],
+          ['B 类私有 172.16/12', a === 172 && b >= 16 && b <= 31],
+          ['C 类私有 192.168/16', a === 192 && b === 168],
+          ['链路本地 169.254/16', a === 169 && b === 254],
+          ['运营商 NAT 100.64/10', a === 100 && b >= 64 && b <= 127],
+          ['组播 224/4', a >= 224 && a <= 239],
+          ['保留 240/4', a >= 240], ['本网 0/8', a === 0],
+          ['文档示例 203.0.113/24', a === 203 && b === 0 && c === 113]
+        ];
+        var hit = rules.filter(function (r) { return r[1]; }).map(function (r) { return r[0]; });
+        return { lines: [['地址', t], ['结论', hit.length ? '非公网：' + hit.join('、') : '公网地址'], ['检查项', String(rules.length)]] };
+      }
+      if (t.indexOf(':') >= 0) {
+        var low = t.toLowerCase();
+        var six = [['回环 ::1', low === '::1'], ['链路本地 fe80::/10', /^fe[89ab]/.test(low)],
+          ['唯一本地 fc00::/7', /^f[cd]/.test(low)], ['组播 ff00::/8', /^ff/.test(low)],
+          ['全零 ::', low === '::']];
+        var hits = six.filter(function (r) { return r[1]; }).map(function (r) { return r[0]; });
+        return { lines: [['地址', t], ['结论', hits.length ? '非公网：' + hits.join('、') : '看起来是公网地址']] };
+      }
+      throw new Error('既不是 IPv4 也不是 IPv6');
+    }
+  });
+
+  t2text({
+    id: 'portinfo', cat: 'net', icon: '🔌', name: '端口速查',
+    desc: '输入端口号查常见用途，或反查某服务用哪个端口',
+    rows: 2, ph: '443 或 ssh',
+    fn: function (s) {
+      var map = {
+        20: 'FTP 数据', 21: 'FTP 控制', 22: 'SSH', 23: 'Telnet（明文，勿用）', 25: 'SMTP',
+        53: 'DNS', 67: 'DHCP 服务端', 68: 'DHCP 客户端', 69: 'TFTP', 80: 'HTTP', 110: 'POP3',
+        123: 'NTP', 135: 'MS RPC', 137: 'NetBIOS 名称', 139: 'NetBIOS 会话', 143: 'IMAP',
+        161: 'SNMP', 389: 'LDAP', 443: 'HTTPS', 445: 'SMB', 465: 'SMTPS', 514: 'Syslog',
+        587: 'SMTP 提交', 631: 'IPP 打印', 993: 'IMAPS', 995: 'POP3S', 1080: 'SOCKS',
+        1433: 'SQL Server', 1521: 'Oracle', 2049: 'NFS', 2181: 'ZooKeeper', 2375: 'Docker（无 TLS）',
+        2376: 'Docker TLS', 3000: 'Node 开发服务', 3306: 'MySQL', 3389: 'RDP', 5000: 'Flask/开发服务',
+        5432: 'PostgreSQL', 5601: 'Kibana', 5672: 'RabbitMQ', 5900: 'VNC', 6379: 'Redis',
+        6443: 'Kubernetes API', 7001: 'WebLogic', 8000: 'HTTP 开发服务', 8080: 'HTTP 代理/备用',
+        8443: 'HTTPS 备用', 8888: 'Jupyter', 9000: 'PHP-FPM/Portainer', 9090: 'Prometheus',
+        9200: 'Elasticsearch', 11211: 'Memcached', 27017: 'MongoDB', 5212: '自建云盘（本项目镜像站）'
+      };
+      var t = s.trim().toLowerCase();
+      if (/^\d+$/.test(t)) {
+        var p = Number(t);
+        if (p < 0 || p > 65535) throw new Error('端口 0–65535');
+        var name = map[p];
+        var level = p < 1024 ? '系统端口（需要管理员权限）' : p < 49152 ? '注册端口' : '动态/临时端口';
+        return { lines: [['端口', String(p)], ['用途', name || '未收录的常见服务，可能是自定义'], ['类别', level]] };
+      }
+      var hits = Object.keys(map).filter(function (k) { return map[k].toLowerCase().indexOf(t) >= 0; });
+      if (!hits.length) throw new Error('没有匹配的服务名');
+      return { lines: hits.map(function (k) { return [k, map[k]]; }) };
+    }
+  });
+
+  t2text({
+    id: 'urlparts', cat: 'net', icon: '🧩', name: 'URL 结构拆解',
+    desc: '把一条链接拆成协议、主机、端口、路径、查询与锚点，并给出规范化结果',
+    rows: 3, ph: 'https://example.com:8443/a/b?x=1&y=2#top',
+    fn: function (s) {
+      var t = s.trim();
+      if (!t) return '请输入链接';
+      var u;
+      try { u = new URL(t); } catch (e) { throw new Error('URL 不合法，记得带协议'); }
+      var params = [];
+      u.searchParams.forEach(function (v, k) { params.push(k + ' = ' + v); });
+      return {
+        lines: [
+          ['协议', u.protocol.replace(':', '')],
+          ['主机', u.hostname],
+          ['端口', u.port || '（默认 ' + (u.protocol === 'https:' ? '443' : '80') + '）'],
+          ['路径', u.pathname],
+          ['查询个数', String(params.length)],
+          ['参数', params.join('; ') || '无'],
+          ['锚点', u.hash || '无'],
+          ['规范化', u.href],
+          ['是否 https', u.protocol === 'https:' ? '是' : '否（建议升级）'],
+          ['用户名信息', u.username ? '包含（注意别外泄）' : '无']
+        ]
+      };
+    }
+  });
+
+  t2text({
+    id: 'ua', cat: 'net', icon: '🕵️', name: 'UA 解析',
+    desc: '从 User-Agent 粗判浏览器、内核、系统与设备类型',
+    rows: 3, ph: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) …',
+    fn: function (s) {
+      var t = s.trim();
+      if (!t) return '粘贴一条 User-Agent';
+      var browser = /Edg\//.test(t) ? 'Edge' : /OPR\/|Opera/.test(t) ? 'Opera' : /Firefox\//.test(t) ? 'Firefox'
+        : /Chrome\//.test(t) ? 'Chrome' : /Safari\//.test(t) && !/Chrome/.test(t) ? 'Safari'
+        : /curl\//.test(t) ? 'curl' : /python-requests/.test(t) ? 'Python requests' : '未知';
+      var engine = /AppleWebKit/.test(t) ? (/Chrome|Edg|OPR/.test(t) ? 'Blink' : 'WebKit') : /Gecko\/|Firefox/.test(t) ? 'Gecko' : '未知';
+      var os = /Windows NT 10/.test(t) ? 'Windows 10/11' : /Windows NT/.test(t) ? 'Windows' : /Mac OS X/.test(t) ? 'macOS'
+        : /Android/.test(t) ? 'Android' : /iPhone|iPad|iPod/.test(t) ? 'iOS/iPadOS' : /Linux/.test(t) ? 'Linux' : '未知';
+      var device = /Mobile/.test(t) ? '手机' : /Tablet|iPad/.test(t) ? '平板' : '桌面';
+      var bot = /bot|crawler|spider|HeadlessChrome/i.test(t);
+      return {
+        lines: [
+          ['浏览器', browser],
+          ['渲染引擎', engine],
+          ['系统', os],
+          ['设备', device],
+          ['疑似爬虫', bot ? '是' : '否'],
+          ['长度', String(t.length) + ' 字符']
+        ]
+      };
+    }
+  });
+
+  /* ---- file ---- */
+  t2js({
+    id: 'filehash', cat: 'file', icon: '🔎', name: '文件哈希',
+    desc: '选本地文件算 SHA-256/1/512，与下载页公布的校验值对照用'
+  }, function (card) {
+    var pm = t2mkParam({ label: '算法', type: 'select', value: 'SHA-256', options: [['SHA-256', 'SHA-256'], ['SHA-1', 'SHA-1'], ['SHA-512', 'SHA-512']] });
+    var f = document.createElement('input');
+    f.type = 'file';
+    var outEl = t2out();
+    var bar = el('div', 'row');
+    var copyB = el('button', 't-btn ghost'); copyB.type = 'button'; copyB.textContent = '复制哈希';
+    copyB.addEventListener('click', function () { copyText(outEl.textContent.split('\n')[1] || ''); });
+    var run = function () {
+      var file = f.files && f.files[0];
+      if (!file) { outEl.textContent = '先选一个文件'; return; }
+      t2run(function () {
+        var sub = needCrypto();
+        return file.arrayBuffer().then(function (buf) {
+          return sub.digest(pm.input.value, buf);
+        }).then(function (d) {
+          return { lines: [['文件', file.name + '（' + humanBytes(file.size) + '）'], [pm.input.value, b2hex(d)]] };
+        });
+      }, outEl, []);
+    };
+    f.addEventListener('change', run);
+    pm.input.addEventListener('change', run);
+    bar.appendChild(copyB);
+    card.appendChild(f); card.appendChild(pm.wrap); card.appendChild(bar); card.appendChild(outEl);
+  });
+
+  t2js({
+    id: 'fileinfo', cat: 'file', icon: '📄', name: '文件信息',
+    desc: '看文件的真实类型、大小、修改时间与扩展名推测的 MIME'
+  }, function (card) {
+    var f = document.createElement('input');
+    f.type = 'file';
+    var outEl = t2out();
+    f.addEventListener('change', function () {
+      var file = f.files && f.files[0];
+      if (!file) return;
+      var ext = (file.name.split('.').pop() || '').toLowerCase();
+      outEl.className = 'out';
+      outEl.textContent = '';
+      [['文件名', file.name], ['大小', humanBytes(file.size) + '（' + file.size + ' 字节）'],
+        ['浏览器识别类型', file.type || '未知（可能未注册）'], ['扩展名', ext || '无'],
+        ['修改时间', file.lastModified ? new Date(file.lastModified).toLocaleString('zh-CN', { hour12: false }) : '未知'],
+        ['路径', file.webkitRelativePath || '（浏览器不暴露本地路径）']].forEach(function (kv) {
+        var d = el('div', 'kvline');
+        var k = el('span'); k.textContent = kv[0];
+        var v = el('span'); v.textContent = kv[1];
+        d.appendChild(k); d.appendChild(v);
+        outEl.appendChild(d);
+      });
+    });
+    card.appendChild(f); card.appendChild(outEl);
+  });
+
+  t2js({
+    id: 'text2file', cat: 'file', icon: '💾', name: '文本存成文件',
+    desc: '把文本按指定文件名与类型存到本地，纯浏览器下载，不上传'
+  }, function (card) {
+    var ta = t2ta(5, '要保存的内容…');
+    var nameM = t2mkParam({ label: '文件名', type: 'text', value: 'notes.txt' });
+    var typeM = t2mkParam({ label: '类型', type: 'select', value: 'text/plain', options: [['text/plain', '文本'], ['text/markdown', 'Markdown'], ['application/json', 'JSON'], ['text/csv', 'CSV']] });
+    var outEl = t2out();
+    var bar = el('div', 'row');
+    var dl = el('button', 't-btn'); dl.type = 'button'; dl.textContent = '下载文件';
+    var go = function () {
+      var blob = new Blob([ta.value], { type: typeM.input.value + ';charset=utf-8' });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href = url; a.download = nameM.input.value || 'file.txt';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+      outEl.className = 'out';
+      outEl.textContent = '已生成 ' + (nameM.input.value || 'file.txt') + '，' + humanBytes(blob.size);
+    };
+    dl.addEventListener('click', go);
+    bar.appendChild(dl);
+    card.appendChild(ta); card.appendChild(nameM.wrap); card.appendChild(typeM.wrap); card.appendChild(bar); card.appendChild(outEl);
+  });
+
+  t2text({
+    id: 'datauri', cat: 'file', icon: '🖼️', name: '文本转 data URI',
+    desc: '把文本编码成可直接塞进 src/href 的 data URI，省掉一次请求',
+    rows: 3, ph: 'body{color:gold}',
+    param: { label: '类型', type: 'select', value: 'text/plain', options: [['text/plain', 'text/plain'], ['text/css', 'text/css'], ['image/svg+xml', 'image/svg+xml'], ['application/json', 'application/json']] },
+    fn: function (s, mime) {
+      var b64 = btoa(unescape(encodeURIComponent(s)));
+      var uri = 'data:' + mime + ';base64,' + b64;
+      return { lines: [['长度', String(uri.length) + ' 字符'], ['体积', humanBytes(uri.length)], ['URI', uri]] };
+    }
+  });
+
+  t2text({
+    id: 'svguri', cat: 'file', icon: '🎨', name: 'SVG 转 data URI',
+    desc: '把内联 SVG 压成 data URI，favicon 与占位图常用',
+    rows: 4, ph: '<svg …></svg>',
+    fn: function (s) {
+      var t = s.trim();
+      if (t.indexOf('<svg') < 0) throw new Error('需要一段 <svg> 代码');
+      var mini = t.replace(/>\s+</g, '><').replace(/<!--[\s\S]*?-->/g, '');
+      var encoded = 'data:image/svg+xml,' + encodeURIComponent(mini)
+        .replace(/'/g, '%27').replace(/"/g, '%22');
+      var b64 = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(mini)));
+      return {
+        lines: [
+          ['原文', String(t.length) + ' 字符'],
+          ['压缩后', String(mini.length) + ' 字符'],
+          ['编码长度', String(encoded.length)],
+          ['URL 编码版', encoded],
+          ['base64 版', b64]
+        ]
+      };
+    }
+  });
+
+  t2text({
+    id: 'csv2md', cat: 'file', icon: '📋', name: 'CSV 转表格',
+    desc: '把 CSV 转成 Markdown 表格或对齐的文本表，自动处理引号与逗号',
+    rows: 5, ph: '姓名,城市\n张三,上海',
+    param: { label: '输出', type: 'select', value: 'md', options: [['md', 'Markdown'], ['txt', '对齐文本']] },
+    fn: function (s, mode) {
+      function parseCsv(text) {
+        var rows = [], row = [], cur = '', q = false;
+        for (var i = 0; i < text.length; i++) {
+          var c = text[i];
+          if (q) {
+            if (c === '"' && text[i + 1] === '"') { cur += '"'; i++; }
+            else if (c === '"') q = false;
+            else cur += c;
+          } else if (c === '"') q = true;
+          else if (c === ',') { row.push(cur); cur = ''; }
+          else if (c === '\n') { row.push(cur); rows.push(row); row = []; cur = ''; }
+          else if (c !== '\r') cur += c;
+        }
+        if (cur || row.length) { row.push(cur); rows.push(row); }
+        return rows.filter(function (r) { return r.some(function (c) { return c !== ''; }); });
+      }
+      var rows = parseCsv(s);
+      if (!rows.length) throw new Error('没有解析到数据');
+      var width = rows[0].length;
+      if (mode === 'md') {
+        var out = ['| ' + rows[0].join(' | ') + ' |', '| ' + rows[0].map(function () { return '---'; }).join(' | ') + ' |'];
+        rows.slice(1).forEach(function (r) {
+          while (r.length < width) r.push('');
+          out.push('| ' + r.slice(0, width).map(function (c) { return c.replace(/\|/g, '\\|'); }).join(' | ') + ' |');
+        });
+        return out.join('\n');
+      }
+      var widths = [];
+      rows.forEach(function (r) { r.forEach(function (c, i) { widths[i] = Math.max(widths[i] || 0, c.length); }); });
+      return rows.map(function (r) {
+        return r.map(function (c, i) { return c + ' '.repeat(widths[i] - c.length); }).join('  ');
+      }).join('\n') + '\n\n' + rows.length + ' 行 × ' + width + ' 列';
+    }
+  });
+
+  /* ---- dev ---- */
+  t2text({
+    id: 'jsonflat', cat: 'dev', icon: '🪜', name: 'JSON 扁平化',
+    desc: '把嵌套对象压成点号路径列表，方便对照字段或导入表格',
+    rows: 6, ph: '{"a":{"b":[1,2]}}',
+    fn: function (s) {
+      var obj = JSON.parse(s);
+      var out = [];
+      (function walk(node, path) {
+        if (node && typeof node === 'object') {
+          if (Array.isArray(node)) {
+            if (!node.length) out.push([path, '[]']);
+            node.forEach(function (v, i) { walk(v, path + '[' + i + ']'); });
+          } else {
+            var keys = Object.keys(node);
+            if (!keys.length) out.push([path, '{}']);
+            keys.forEach(function (k) { walk(node[k], path ? path + '.' + k : k); });
+          }
+        } else out.push([path || '(root)', JSON.stringify(node)]);
+      })(obj, '');
+      return { lines: out };
+    }
+  });
+
+  t2text({
+    id: 'jsonesc', cat: 'dev', icon: '🔀', name: 'JSON 字符串转义',
+    desc: '一键生成带转义的 JSON 字符串，或还原成可读文本',
+    rows: 4, ph: '第一行\n第二行 "引号"',
+    param: { label: '方向', type: 'select', value: 'esc', options: [['esc', '转义'], ['unesc', '还原']] },
+    fn: function (s, dir) {
+      if (dir === 'unesc') {
+        try { return JSON.parse('"' + s.replace(/^"|"$/g, '').replace(/\\"/g, '\\"') + '"'); } catch (e) { return JSON.parse(s); }
+      }
+      return JSON.stringify(s);
+    }
+  });
+
+  t2text({
+    id: 'sqlfmt', cat: 'dev', icon: '🗄️', name: 'SQL 美化',
+    desc: '关键字大写并换行缩进，长查询读起来顺眼很多',
+    rows: 6, ph: 'select id,name from users where age>18 order by id',
+    fn: function (s) {
+      var kw = ['SELECT', 'FROM', 'WHERE', 'GROUP BY', 'ORDER BY', 'HAVING', 'LIMIT', 'OFFSET',
+        'LEFT JOIN', 'RIGHT JOIN', 'INNER JOIN', 'OUTER JOIN', 'JOIN', 'ON', 'UNION ALL', 'UNION',
+        'INSERT INTO', 'VALUES', 'UPDATE', 'SET', 'DELETE FROM', 'AND', 'OR', 'AS'];
+      var out = s.replace(/\s+/g, ' ').trim();
+      kw.forEach(function (k) {
+        out = out.replace(new RegExp('\\b' + k.replace(/ /g, '\\s+') + '\\b', 'gi'), k);
+      });
+      var breaks = ['SELECT', 'FROM', 'WHERE', 'GROUP BY', 'ORDER BY', 'HAVING', 'LIMIT', 'OFFSET',
+        'LEFT JOIN', 'RIGHT JOIN', 'INNER JOIN', 'JOIN', 'UNION ALL', 'UNION', 'INSERT INTO', 'VALUES', 'UPDATE', 'SET', 'DELETE FROM'];
+      breaks.forEach(function (k) { out = out.replace(new RegExp('\\s+' + k + '\\b', 'g'), '\n' + k); });
+      out = out.replace(/\s+(AND|OR)\s+/g, '\n  $1 ');
+      return out.replace(/^\n/, '').replace(/,\s*/g, ',\n  ');
+    }
+  });
+
+  t2text({
+    id: 'xmlfmt', cat: 'dev', icon: '📐', name: 'XML / HTML 缩进',
+    desc: '把挤成一行的标记文本按层级缩进，自闭合与注释都照顾到',
+    rows: 5, ph: '<a><b>x</b></a>',
+    fn: function (s) {
+      var t = s.replace(/>\s+</g, '><').replace(/\s+/g, ' ').trim();
+      var tokens = t.replace(/(>)(<)(\/?)/g, '$1\n$2$3').split('\n');
+      var depth = 0, out = [];
+      tokens.forEach(function (tk) {
+        var line = tk.trim();
+        if (!line) return;
+        var isClose = /^<\//.test(line);
+        var selfClose = /\/>$/.test(line) || /^<!(doctype|--|\?)/i.test(line) || /^<\?/.test(line);
+        if (isClose) depth = Math.max(0, depth - 1);
+        out.push('  '.repeat(depth) + line);
+        var open = /^</.test(line) && !isClose && !selfClose && !/<\/[\w:.-]+>$/.test(line);
+        if (open) depth++;
+      });
+      return out.join('\n');
+    }
+  });
+
+  t2text({
+    id: 'yaml2json', cat: 'dev', icon: '🧾', name: 'YAML 转 JSON',
+    desc: '支持常见子集：键值、嵌套缩进、短横线列表、行内注释',
+    rows: 6, ph: 'name: xk\nlist:\n  - a\n  - b',
+    fn: function (s) {
+      var lines = s.split(/\r?\n/).filter(function (l) { return l.trim() && !/^\s*#/.test(l); });
+      var root = {}, stack = [{ indent: -1, node: root }];
+      lines.forEach(function (raw) {
+        var indent = raw.match(/^\s*/)[0].length;
+        var line = raw.trim().replace(/\s+#.*$/, '');
+        while (stack.length > 1 && indent <= stack[stack.length - 1].indent) stack.pop();
+        var parent = stack[stack.length - 1].node;
+        if (line[0] === '-') {
+          var val = line.slice(1).trim();
+          if (!Array.isArray(parent)) throw new Error('列表项缺少父级数组');
+          if (val.indexOf(':') > 0) {
+            var obj = {};
+            var kv0 = val.split(/:\s*/);
+            obj[kv0[0]] = kv0.slice(1).join(':') || '';
+            parent.push(obj);
+            stack.push({ indent: indent, node: obj });
+          } else parent.push(val.replace(/^["']|["']$/g, ''));
+        } else {
+          var idx = line.indexOf(':');
+          if (idx < 0) throw new Error('无法解析行：' + line);
+          var key = line.slice(0, idx).trim();
+          var value = line.slice(idx + 1).trim();
+          if (!value) {
+            var child = {};
+            parent[key] = child;
+            stack.push({ indent: indent, node: child });
+            parent.__pending = key;
+          } else parent[key] = value.replace(/^["']|["']$/g, '');
+        }
+      });
+      return JSON.stringify(root, null, 2);
+    }
+  });
+
+  t2text({
+    id: 'curl2fetch', cat: 'dev', icon: '🌐', name: 'curl 转 fetch',
+    desc: '把复制来的 curl 命令翻成 JS fetch 代码，请求头与数据体都保留',
+    rows: 4, ph: "curl -X POST https://api.example.com -H 'Content-Type: application/json' -d '{\"a\":1}'",
+    fn: function (s) {
+      var t = s.replace(/\\\r?\n/g, ' ').trim();
+      var urlM = t.match(/https?:\/\/[^\s'"]+/);
+      if (!urlM) throw new Error('没找到 URL');
+      var method = (t.match(/-X\s+([A-Z]+)/) || [])[1] || (/--data|--data-raw|\s-d\s/.test(t) ? 'POST' : 'GET');
+      var headers = {};
+      var hRe = /-H\s+['"]([^'"]+)['"]/g, m;
+      while ((m = hRe.exec(t))) {
+        var i = m[1].indexOf(':');
+        headers[m[1].slice(0, i).trim()] = m[1].slice(i + 1).trim();
+      }
+      var bodyM = t.match(/(?:--data-raw|--data|-d)\s+['"]([\s\S]*?)['"](?:\s|$)/);
+      var body = bodyM ? bodyM[1].replace(/\\"/g, '"') : null;
+      var head = Object.keys(headers).map(function (k) { return "    '" + k + "': " + JSON.stringify(headers[k]); });
+      var out = ["fetch('" + urlM[0] + "', {", "  method: '" + method + "',"];
+      if (head.length) out.push('  headers: {\n' + head.join(',\n') + '\n  },');
+      if (body) out.push('  body: ' + JSON.stringify(body) + ',');
+      out.push('})');
+      out.push('  .then(function (r) { return r.json(); })');
+      out.push('  .then(function (data) { console.log(data); })');
+      out.push('  .catch(function (e) { console.error(e); });');
+      return out.join('\n');
+    }
+  });
+
+  t2text({
+    id: 'mime', cat: 'dev', icon: '📎', name: 'MIME 类型速查',
+    desc: '按扩展名查 MIME，或反查常见扩展名',
+    rows: 2, ph: 'json 或 application/json',
+    fn: function (s) {
+      var map = { html: 'text/html', css: 'text/css', js: 'text/javascript', mjs: 'text/javascript',
+        json: 'application/json', md: 'text/markdown', txt: 'text/plain', csv: 'text/csv',
+        xml: 'application/xml', svg: 'image/svg+xml', png: 'image/png', jpg: 'image/jpeg',
+        jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', avif: 'image/avif', ico: 'image/x-icon',
+        mp4: 'video/mp4', webm: 'video/webm', mp3: 'audio/mpeg', wav: 'audio/wav', ogg: 'audio/ogg',
+        woff: 'font/woff', woff2: 'font/woff2', ttf: 'font/ttf', otf: 'font/otf',
+        pdf: 'application/pdf', zip: 'application/zip', gz: 'application/gzip',
+        '7z': 'application/x-7z-compressed', apk: 'application/vnd.android.package-archive',
+        exe: 'application/vnd.microsoft.portable-executable', wasm: 'application/wasm',
+        map: 'application/json', webmanifest: 'application/manifest+json' };
+      var t = s.trim().toLowerCase().replace(/^\./, '');
+      if (!t) return '输入扩展名或 MIME';
+      if (map[t]) return t + ' → ' + map[t];
+      var hit = Object.keys(map).filter(function (k) { return map[k] === t; });
+      if (hit.length) return t + ' ← ' + hit.join(' / ');
+      var loose = Object.keys(map).filter(function (k) { return k.indexOf(t) >= 0 || map[k].indexOf(t) >= 0; });
+      if (loose.length) return { lines: loose.map(function (k) { return [k, map[k]]; }) };
+      throw new Error('没有收录：' + t);
+    }
+  });
+
+  t2text({
+    id: 'httpstatus', cat: 'dev', icon: '📟', name: 'HTTP 状态码',
+    desc: '查状态码含义与常见成因，写接口排查问题时随手看',
+    rows: 2, ph: '404',
+    fn: function (s) {
+      var map = {
+        200: '成功', 201: '已创建', 202: '已接受（异步处理中）', 204: '成功但无内容',
+        301: '永久重定向', 302: '临时重定向', 304: '未修改（走缓存）', 307: '临时重定向（保持方法）',
+        308: '永久重定向（保持方法）', 400: '请求有误', 401: '未认证', 403: '已认证但无权限',
+        404: '资源不存在', 405: '方法不允许', 406: '无法满足 Accept', 408: '请求超时',
+        409: '状态冲突', 410: '已永久删除', 413: '请求体过大', 414: 'URI 过长',
+        415: '不支持的媒体类型', 418: '我是茶壶（彩蛋）', 422: '语义错误（常见于校验失败）',
+        429: '请求过多被限流', 451: '因法律原因不可用',
+        500: '服务器内部错误', 501: '未实现', 502: '网关错误（上游挂了）', 503: '服务不可用',
+        504: '网关超时', 505: 'HTTP 版本不支持'
+      };
+      var t = s.trim();
+      if (/^\d+$/.test(t)) {
+        var c = Number(t), name = map[c];
+        var group = c < 200 ? '信息' : c < 300 ? '成功' : c < 400 ? '重定向' : c < 500 ? '客户端错误' : '服务端错误';
+        return { lines: [['状态码', String(c)], ['类别', group], ['含义', name || '未收录的标准码'] ] };
+      }
+      if (!t) return '输入状态码，例如 404';
+      var hits = Object.keys(map).filter(function (k) { return map[k].indexOf(t) >= 0; });
+      if (!hits.length) throw new Error('没有匹配项');
+      return { lines: hits.map(function (k) { return [k, map[k]]; }) };
+    }
+  });
+
+  t2text({
+    id: 'csstidy', cat: 'dev', icon: '🎨', name: 'CSS 美化',
+    desc: '压缩版样式表按括号层级展开，顺手补缩进与空行',
+    rows: 5, ph: 'a{color:red;b{x:1}}',
+    fn: function (s) {
+      var t = s.replace(/\s+/g, ' ').replace(/\s*([{};])\s*/g, '$1').trim();
+      var depth = 0, out = '';
+      for (var i = 0; i < t.length; i++) {
+        var c = t[i];
+        if (c === '{') { out += ' {\n'; depth++; out += '  '.repeat(depth); }
+        else if (c === '}') { depth = Math.max(0, depth - 1); out = out.replace(/[ ]+$/, ''); out += '\n' + '  '.repeat(depth) + '}\n' + '  '.repeat(depth); }
+        else if (c === ';') { out += ';\n' + '  '.repeat(depth); }
+        else out += c;
+      }
+      return out.split('\n').map(function (l) { return l.replace(/\s+$/, ''); }).filter(function (l, idx, arr) {
+        return !(l === '' && arr[idx - 1] === '');
+      }).join('\n').trim();
+    }
+  });
+
+  t2text({
+    id: 'striphtml', cat: 'dev', icon: '🧼', name: '去 HTML 标签',
+    desc: '抽出纯文本，可选保留换行与解码实体，复制网页正文时用',
+    rows: 5, ph: '<p>你好</p><p>世界</p>',
+    param: { label: '块级换行', type: 'select', value: 'keep', options: [['keep', '保留（每块换行）'], ['flat', '不留换行']] },
+    fn: function (s, mode) {
+      var html = s;
+      if (mode === 'keep') html = html.replace(/<\/(p|div|li|h[1-6]|tr|section|article|blockquote)>/gi, '\n').replace(/<br\s*\/?>/gi, '\n');
+      var ta = document.createElement('textarea');
+      ta.innerHTML = html.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<style[\s\S]*?<\/style>/gi, '');
+      var text = ta.value.replace(/<[^>]+>/g, '');
+      return text.split('\n').map(function (l) { return l.trim(); }).filter(function (l, i, arr) { return l || (arr[i - 1] && arr[i + 1]); }).join('\n').trim();
+    }
+  });
+
+  t2text({
+    id: 'jsbeautify', cat: 'dev', icon: '🪄', name: 'JS 基础缩进',
+    desc: '压缩代码按大括号与圆括号缩进，够读就行，取代不了 prettier',
+    rows: 5, ph: 'function a(){if(b){c()}}',
+    fn: function (s) {
+      var t = s.replace(/\s+/g, ' ').trim(), depth = 0, out = '', inStr = null;
+      for (var i = 0; i < t.length; i++) {
+        var c = t[i];
+        if (inStr) {
+          out += c;
+          if (c === inStr && t[i - 1] !== '\\') inStr = null;
+          continue;
+        }
+        if (c === '"' || c === "'" || c === '`') { inStr = c; out += c; continue; }
+        if (c === '{') { out += ' {\n'; depth++; out += '  '.repeat(depth); continue; }
+        if (c === '}') { depth = Math.max(0, depth - 1); out = out.replace(/\s+$/, ''); out += '\n' + '  '.repeat(depth) + '}'; continue; }
+        if (c === ';') { out += ';\n' + '  '.repeat(depth); continue; }
+        out += c;
+      }
+      return out.split('\n').map(function (l) { return l.replace(/\s+$/, ''); }).join('\n').trim();
+    }
+  });
+
+  t2text({
+    id: 'sortjson', cat: 'dev', icon: '🔤', name: 'JSON 键排序',
+    desc: '递归按字母序排列对象键，便于比对两份配置的差异',
+    rows: 5, ph: '{"b":1,"a":{"d":1,"c":2}}',
+    fn: function (s) {
+      function sort(v) {
+        if (Array.isArray(v)) return v.map(sort);
+        if (v && typeof v === 'object') {
+          var out = {};
+          Object.keys(v).sort().forEach(function (k) { out[k] = sort(v[k]); });
+          return out;
+        }
+        return v;
+      }
+      return JSON.stringify(sort(JSON.parse(s)), null, 2);
+    }
+  });
+
+  t2text({
+    id: 'jsonminify', cat: 'dev', icon: '🗜️', name: 'JSON 压缩',
+    desc: '去掉所有空白，给出压缩前后体积与节省比例',
+    rows: 5, ph: '{\n  "a": 1\n}',
+    fn: function (s) {
+      var pretty = JSON.stringify(JSON.parse(s));
+      var before = new TextEncoder().encode(s).length, after = new TextEncoder().encode(pretty).length;
+      return pretty + '\n\n原始 ' + humanBytes(before) + ' → 压缩 ' + humanBytes(after)
+        + '（省 ' + nf((1 - after / before) * 100, 1) + '%）';
+    }
+  });
+
+  t2text({
+    id: 'regexexplain', cat: 'dev', icon: '🧠', name: '正则拆解',
+    desc: '逐段解释正则的含义，并给出匹配预览，看别人的规则不再头大',
+    rows: 3, ph: '^[a-z]+@[a-z]+\\.[a-z]{2,}$',
+    param: { label: '测试文本', type: 'text', value: 'hello@example.com' },
+    fn: function (s, sample) {
+      var re;
+      try { re = new RegExp(s); } catch (e) { throw new Error('正则有语法错误：' + e.message); }
+      var parts = [], i = 0, src = s;
+      var named = { '\\d': '数字', '\\D': '非数字', '\\w': '单词字符（字母/数字/下划线）', '\\W': '非单词字符',
+        '\\s': '空白', '\\S': '非空白', '\\b': '单词边界', '\\B': '非单词边界', '.': '任意字符（默认不含换行）' };
+      while (i < src.length) {
+        var c = src[i], desc = '';
+        if (c === '^') { desc = '开头锚点'; i++; }
+        else if (c === '$') { desc = '结尾锚点'; i++; }
+        else if (c === '[') {
+          var close = src.indexOf(']', i);
+          if (close < 0) throw new Error('字符组没有闭合');
+          var body = src.slice(i, close + 1);
+          desc = '字符组 ' + body + (body[1] === '^' ? '（取反）' : '');
+          i = close + 1;
+        }
+        else if (c === '(') {
+          var kind = src.slice(i, i + 3) === '(?:' ? '非捕获分组' : src.slice(i, i + 2) === '(?' ? '特殊分组' : '捕获分组';
+          desc = kind; i += kind === '捕获分组' ? 1 : 2;
+        }
+        else if (c === ')') { desc = '分组结束'; i++; }
+        else if (c === '|') { desc = '或'; i++; }
+        else if (c === '\\' && i + 1 < src.length) {
+          desc = named[src.slice(i, i + 2)] || ('转义 ' + src[i + 1]); i += 2;
+        }
+        else if ('*+?'.indexOf(c) >= 0) {
+          desc = { '*': '重复 0 次或多次', '+': '重复 1 次或多次', '?': '可选（0 或 1 次）' }[c];
+          if (src[i + 1] === '?') { desc += '，懒惰模式'; i++; }
+          i++;
+        }
+        else if (c === '{') {
+          var e2 = src.indexOf('}', i);
+          desc = '重复次数 ' + src.slice(i, e2 + 1);
+          i = e2 + 1;
+        }
+        else { desc = '字面量 ' + JSON.stringify(c); i++; }
+        parts.push(desc);
+      }
+      var m = sample ? re.exec(sample) : null;
+      return {
+        lines: [
+          ['分段', parts.join(' → ')],
+          ['测试文本', sample || '（未填）'],
+          ['是否匹配', m ? '匹配' : '不匹配'],
+          ['匹配内容', m ? String(m[0]) : '—'],
+          ['分组数', String(new RegExp(s + '|').exec('') ? 0 : 0) + ' / ' + (function () {
+            var c = 0; for (var j = 0; j < s.length; j++) if (s[j] === '(' && s[j + 1] !== '?') c++; return String(c);
+          })()]
+        ]
+      };
+    }
+  });
+
+  t2text({
+    id: 'globmatch', cat: 'dev', icon: '🎯', name: '通配符匹配',
+    desc: '用 * 与 ? 测试路径是否命中规则，和 .gitignore 语义一致',
+    rows: 4, ph: '*.js',
+    param: { label: '测试路径', type: 'text', value: 'src/app.js' },
+    fn: function (s, sample) {
+      var pat = s.trim();
+      if (!pat) throw new Error('先写一个通配符');
+      var re = new RegExp('^' + pat.replace(/[.+^${}()|[\]\\]/g, '\\$&')
+        .replace(/\*\*/g, '\u0001').replace(/\*/g, '[^/]*').replace(/\?/g, '[^/]')
+        .replace(/\u0001/g, '.*') + '$');
+      var target = (sample || '').trim();
+      return {
+        lines: [
+          ['模式', pat],
+          ['测试路径', target || '（未填）'],
+          ['结果', re.test(target) ? '命中' : '不命中'],
+          ['规则', '** 跨目录、* 不跨目录、? 单个字符']
+        ]
+      };
+    }
+  });
+
+/* ==== 第二批工具（batch2c）：补齐 120 ---- */
+  t2text({
+    id: 'rmbcap', cat: 'calc', icon: '💴', name: '人民币大写',
+    desc: '金额转财务大写，处理零角零分、万位与亿位进位',
+    rows: 2, ph: '12345.67',
+    fn: function (s) {
+      var raw = String(s).replace(/[,\s¥￥]/g, '').trim();
+      if (!/^\d+(\.\d{1,2})?$/.test(raw)) throw new Error('请输入金额，最多两位小数');
+      var parts = raw.split('.');
+      var intPart = parts[0].replace(/^0+(?=\d)/, ''), dec = (parts[1] || '').padEnd(2, '0');
+      var digits = ['零', '壹', '贰', '叁', '肆', '伍', '陆', '柒', '捌', '玖'];
+      var units = ['', '拾', '佰', '仟'];
+      var big = ['', '万', '亿', '万亿'];
+      var groups = [];
+      var str = intPart;
+      while (str.length > 4) { groups.unshift(str.slice(-4)); str = str.slice(0, -4); }
+      groups.unshift(str);
+      var zhInt = groups.map(function (g, gi) {
+        var out = '', zero = false, len = g.length;
+        for (var i = 0; i < len; i++) {
+          var d = Number(g[i]), pos = len - 1 - i;
+          if (d === 0) zero = true;
+          else {
+            if (zero && out) out += '零';
+            zero = false;
+            out += digits[d] + units[pos];
+          }
+        }
+        var unit = big[groups.length - 1 - gi];
+        if (!out) return '';
+        return out + unit;
+      }).join('').replace(/零+/g, '零').replace(/零$/, '');
+      zhInt = zhInt.replace(/^壹拾/, '拾');
+      if (!zhInt) zhInt = '零';
+      var jiao = Number(dec[0]), fen = Number(dec[1]);
+      var zhDec = '';
+      if (!jiao && !fen) zhDec = '整';
+      else {
+        zhDec = (jiao ? digits[jiao] + '角' : (fen ? '零' : '')) + (fen ? digits[fen] + '分' : (jiao ? '整' : ''));
+      }
+      return '人民币' + zhInt + '元' + zhDec;
+    }
+  });
+
+  t2text({
+    id: 'chmod', cat: 'dev', icon: '🔑', name: '文件权限换算',
+    desc: 'rwx 与八进制数字互转，也支持 suid/sgid 位与 chmod 命令生成',
+    rows: 2, ph: '755 或 rwxr-xr-x',
+    fn: function (s) {
+      var t = s.trim();
+      if (/^[0-7]{3,4}$/.test(t)) {
+        var num = t.length === 3 ? '0' + t : t;
+        var map = { 0: '---', 1: '--x', 2: '-w-', 3: '-wx', 4: 'r--', 5: 'r-x', 6: 'rw-', 7: 'rwx' };
+        var sym = map[Number(num[1])] + map[Number(num[2])] + map[Number(num[3])];
+        return {
+          lines: [
+            ['符号', sym],
+            ['八进制', num],
+            ['属主', map[Number(num[1])]],
+            ['属组', map[Number(num[2])]],
+            ['其他人', map[Number(num[3])]],
+            ['特殊位', Number(num[0]) ? '有（suid/sgid/sticky）: ' + num[0] : '无'],
+            ['命令', 'chmod ' + num + ' 文件名']
+          ]
+        };
+      }
+      var m = t.match(/^([r-])([w-])([x-])([r-])([w-])([x-])([r-])([w-])([x-])$/);
+      if (!m) throw new Error('写成 755 或 rwxr-xr-x');
+      function bit(a, b, c) { return (a === 'r' ? 4 : 0) + (b === 'w' ? 2 : 0) + (c === 'x' ? 1 : 0); }
+      var owner = bit(m[1], m[2], m[3]), group = bit(m[4], m[5], m[6]), other = bit(m[7], m[8], m[9]);
+      return {
+        lines: [
+          ['八进制', '' + owner + group + other],
+          ['属主', String(owner)], ['属组', String(group)], ['其他人', String(other)],
+          ['命令', 'chmod ' + owner + group + other + ' 文件名']
+        ]
+      };
+    }
+  });
+
+  t2text({
+    id: 'luhn', cat: 'dev', icon: '🔢', name: 'Luhn 校验位',
+    desc: '银行卡号的模 10 校验，也能补算出正确校验位',
+    rows: 3, ph: '6222020000000000000',
+    param: { label: '动作', type: 'select', value: 'check', options: [['check', '校验'], ['gen', '补校验位']] },
+    fn: function (s, mode) {
+      var digits = s.replace(/\D/g, '');
+      if (digits.length < 2) throw new Error('至少两位数字');
+      function luhnSum(str) {
+        var sum = 0;
+        for (var i = 0; i < str.length; i++) {
+          var d = Number(str[str.length - 1 - i]);
+          if (i % 2 === 1) { d *= 2; if (d > 9) d -= 9; }
+          sum += d;
+        }
+        return sum;
+      }
+      if (mode === 'gen') {
+        var base = digits, need = 0;
+        for (var g = 0; g < 10; g++) {
+          if (luhnSum(base + g) % 10 === 0) { need = g; break; }
+        }
+        return { lines: [['补位后', base + need], ['校验位', String(need)], ['长度', String(base.length + 1)]] };
+      }
+      var ok = luhnSum(digits) % 10 === 0;
+      return {
+        lines: [
+          ['数字串', digits],
+          ['长度', String(digits.length)],
+          ['校验', ok ? '通过' : '不通过（最后一位应为 ' + ((10 - (luhnSum(digits.slice(0, -1) + '0') % 10)) % 10) + '）'],
+          ['分组显示', digits.replace(/(.{4})/g, '$1 ').trim()]
+        ]
+      };
+    }
+  });
+
+  t2text({
+    id: 'idcard', cat: 'dev', icon: '🪪', name: '身份证解析',
+    desc: '解析 18 位身份证的地区码、生日、性别与校验位（纯本地计算）',
+    rows: 2, ph: '11010519491231002X',
+    fn: function (s) {
+      var id = s.trim().toUpperCase();
+      if (!/^\d{17}[\dX]$/.test(id)) throw new Error('需要 18 位身份证号');
+      var weights = [7, 9, 10, 5, 8, 4, 2, 1, 6, 3, 7, 9, 10, 5, 8, 4, 2];
+      var codes = '10X98765432';
+      var sum = 0;
+      for (var i = 0; i < 17; i++) sum += Number(id[i]) * weights[i];
+      var expect = codes[sum % 11];
+      var birth = id.slice(6, 14);
+      var y = Number(birth.slice(0, 4)), m2 = Number(birth.slice(4, 6)), d = Number(birth.slice(6, 8));
+      var date = new Date(y, m2 - 1, d);
+      var validDate = date.getFullYear() === y && date.getMonth() === m2 - 1 && date.getDate() === d;
+      var age = null;
+      if (validDate) {
+        var now = new Date();
+        age = now.getFullYear() - y - ((now.getMonth() + 1 < m2 || (now.getMonth() + 1 === m2 && now.getDate() < d)) ? 1 : 0);
+      }
+      var seq = Number(id.slice(14, 17));
+      return {
+        lines: [
+          ['校验位', expect === id[17] ? '正确' : '错误（应为 ' + expect + '）'],
+          ['省级代码', id.slice(0, 2)],
+          ['地区代码', id.slice(0, 6)],
+          ['出生日期', birth.slice(0, 4) + '-' + birth.slice(4, 6) + '-' + birth.slice(6, 8) + (validDate ? '' : '（日期非法）')],
+          ['年龄', age === null ? '—' : age + ' 岁'],
+          ['性别', seq % 2 ? '男' : '女'],
+          ['顺序码', String(seq)]
+        ]
+      };
+    }
+  });
+
+  t2text({
+    id: 'crc32', cat: 'dev', icon: '🧾', name: 'CRC32 校验',
+    desc: '算文本或十六进制字节的 CRC32，跟压缩包校验值对照',
+    rows: 4, ph: 'hello',
+    fn: function (s) {
+      var table = (function () {
+        var t = new Uint32Array(256);
+        for (var n = 0; n < 256; n++) {
+          var c = n;
+          for (var k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1;
+          t[n] = c >>> 0;
+        }
+        return t;
+      })();
+      var bytes = new TextEncoder().encode(s);
+      var crc = 0xFFFFFFFF;
+      for (var i = 0; i < bytes.length; i++) crc = (crc >>> 8) ^ table[(crc ^ bytes[i]) & 0xFF];
+      crc = (crc ^ 0xFFFFFFFF) >>> 0;
+      return {
+        lines: [
+          ['CRC32', crc.toString(16).padStart(8, '0')],
+          ['十进制', String(crc)],
+          ['输入字节', String(bytes.length)]
+        ]
+      };
+    }
+  });
+
+  t2text({
+    id: 'bigint', cat: 'num', icon: '🧮', name: '大整数运算',
+    desc: '超出安全整数也能算：加减乘除与取余，用 BigInt 精确计算',
+    rows: 3, ph: '9007199254740991 * 3',
+    param: { label: '运算符', type: 'select', value: '*', options: [['+', '+ 加'], ['-', '− 减'], ['*', '× 乘'], ['/', '÷ 除'], ['%', '% 取余'], ['**', '^ 幂']] },
+    fn: function (s, op) {
+      var m = s.match(/^\s*(-?\d+)\s*(?:[-+*/%]|\*\*)?\s*(-?\d+)\s*$/);
+      var a, b;
+      if (m) { a = BigInt(m[1]); b = BigInt(m[2]); }
+      else { throw new Error('写成 a 与 b 两个整数，例如 123456789012345678 * 9'); }
+      var res;
+      if (op === '+') res = a + b;
+      else if (op === '-') res = a - b;
+      else if (op === '*') res = a * b;
+      else if (op === '/') { if (b === 0n) throw new Error('除数不能为 0'); res = a / b; }
+      else if (op === '%') { if (b === 0n) throw new Error('除数不能为 0'); res = a % b; }
+      else {
+        if (b < 0n) throw new Error('指数不能为负');
+        if (b > 10000n) throw new Error('指数过大');
+        res = a ** b;
+      }
+      var str = res.toString();
+      return {
+        lines: [
+          ['结果', str.length > 200 ? str.slice(0, 200) + '…（共 ' + str.length + ' 位）' : str],
+          ['位数', String(str.replace('-', '').length)],
+          ['近似（双精度）', String(Number(res))],
+          ['余数（÷1000）', (res % 1000n).toString()]
+        ]
+      };
+    }
+  });
+
+  t2form({
+    id: 'contrast', cat: 'num', icon: '🌗', name: '颜色对比度',
+    desc: '算前后景 WCAG 对比度，判断是否达到 AA / AAA 标准',
+    fields: [
+      { id: 'fg', label: '文字色', type: 'text', value: '#fcd34d' },
+      { id: 'bg', label: '背景色', type: 'text', value: '#04060f' }
+    ],
+    compute: function (v) {
+      function parse(c) {
+        var t = String(c).trim().replace('#', '');
+        if (/^[0-9a-fA-F]{3}$/.test(t)) t = t.split('').map(function (x) { return x + x; }).join('');
+        if (!/^[0-9a-fA-F]{6}$/.test(t)) throw new Error('色值写成 #RRGGBB：' + c);
+        return [parseInt(t.slice(0, 2), 16), parseInt(t.slice(2, 4), 16), parseInt(t.slice(4, 6), 16)];
+      }
+      function lum(rgb) {
+        var a = rgb.map(function (x) {
+          var s = x / 255;
+          return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+        });
+        return 0.2126 * a[0] + 0.7152 * a[1] + 0.0722 * a[2];
+      }
+      var l1 = lum(parse(v.fg)), l2 = lum(parse(v.bg));
+      var ratio = (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
+      function pass(n) { return ratio >= n ? '通过' : '不通过'; }
+      return {
+        lines: [
+          ['对比度', nf(ratio, 2) + ' : 1'],
+          ['正文 AA (4.5)', pass(4.5)],
+          ['正文 AAA (7)', pass(7)],
+          ['大字 AA (3)', pass(3)],
+          ['大字 AAA (4.5)', pass(4.5)],
+          ['相对亮度', '前景 ' + nf(l1, 4) + ' / 背景 ' + nf(l2, 4)]
+        ]
+      };
+    }
+  });
+
+  t2form({
+    id: 'gradient', cat: 'num', icon: '🌈', name: '渐变生成',
+    desc: '两色之间插出多档色阶，直接给出 CSS 线性渐变代码',
+    fields: [
+      { id: 'a', label: '起始色', type: 'text', value: '#04060f' },
+      { id: 'b', label: '结束色', type: 'text', value: '#fcd34d' },
+      { id: 'n', label: '档数', type: 'number', value: 6, min: 2, max: 20 }
+    ],
+    compute: function (v) {
+      function parse(c) {
+        var t = String(c).trim().replace('#', '');
+        if (/^[0-9a-fA-F]{3}$/.test(t)) t = t.split('').map(function (x) { return x + x; }).join('');
+        if (!/^[0-9a-fA-F]{6}$/.test(t)) throw new Error('色值写成 #RRGGBB');
+        return [parseInt(t.slice(0, 2), 16), parseInt(t.slice(2, 4), 16), parseInt(t.slice(4, 6), 16)];
+      }
+      var A = parse(v.a), B = parse(v.b), n = t2int(v.n);
+      var stops = [];
+      for (var i = 0; i < n; i++) {
+        var r = i / (n - 1);
+        var c = A.map(function (x, k) { return Math.round(x + (B[k] - x) * r); });
+        stops.push('#' + c.map(function (x) { return x.toString(16).padStart(2, '0'); }).join(''));
+      }
+      return {
+        lines: [
+          ['色阶', stops.join(' → ')],
+          ['CSS', 'background: linear-gradient(90deg, ' + stops.join(', ') + ');'],
+          ['等距百分比', stops.map(function (s, i) { return s + ' ' + Math.round(i / (n - 1) * 100) + '%'; }).join(', ')]
+        ]
+      };
+    }
+  });
+
+  t2form({
+    id: 'speed', cat: 'net', icon: '🚀', name: '下载耗时估算',
+    desc: '按文件体积与带宽估下载时间，也给出 150 MB 大包的对照',
+    fields: [
+      { id: 'size', label: '文件体积 (MB)', type: 'number', value: 150, step: 'any' },
+      { id: 'mbps', label: '带宽 (Mbps)', type: 'number', value: 100, step: 'any' }
+    ],
+    compute: function (v) {
+      var mb = t2num(v.size), mbps = t2num(v.mbps);
+      if (mbps <= 0) throw new Error('带宽要大于 0');
+      var seconds = mb * 8 / mbps;
+      function human(sec) {
+        if (sec < 60) return nf(sec, 1) + ' 秒';
+        if (sec < 3600) return Math.floor(sec / 60) + ' 分 ' + nf(sec % 60, 0) + ' 秒';
+        return Math.floor(sec / 3600) + ' 小时 ' + Math.round(sec % 3600 / 60) + ' 分';
+      }
+      return {
+        lines: [
+          ['理论耗时', human(seconds)],
+          ['等效速率', nf(mbps / 8, 2) + ' MB/s'],
+          ['按 80% 实际带宽', human(seconds / 0.8)],
+          ['1 GB 需', human(1024 * 8 / mbps)],
+          ['150 MB 需', human(150 * 8 / mbps)]
+        ]
+      };
+    }
+  });
+
+  t2text({
+    id: 'srt', cat: 'time', icon: '🎬', name: '字幕时间轴',
+    desc: 'SRT 字幕整体平移或缩放时间，改帧率、对齐配音都用得到',
+    rows: 6, ph: '1\n00:00:01,000 --> 00:00:03,000\n你好',
+    param: { label: '偏移（秒）', type: 'number', value: 2.5, step: 'any' },
+    fn: function (s, off) {
+      var shift = t2num(off);
+      function fmt(ms) {
+        if (ms < 0) ms = 0;
+        var h = Math.floor(ms / 3600000), m = Math.floor(ms % 3600000 / 60000);
+        var sec = Math.floor(ms % 60000 / 1000), msec = Math.round(ms % 1000);
+        return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0') + ':'
+          + String(sec).padStart(2, '0') + ',' + String(msec).padStart(3, '0');
+      }
+      function parse(ts) {
+        var m = ts.match(/(\d+):(\d+):(\d+)[,.](\d+)/);
+        if (!m) return null;
+        return Number(m[1]) * 3600000 + Number(m[2]) * 60000 + Number(m[3]) * 1000 + Number(m[4]);
+      }
+      var count = 0;
+      var out = s.replace(/(\d+:\d+:\d+[,.]\d+)\s*-->\s*(\d+:\d+:\d+[,.]\d+)/g, function (all, a, b) {
+        var ia = parse(a), ib = parse(b);
+        if (ia === null || ib === null) return all;
+        count++;
+        return fmt(ia + shift * 1000) + ' --> ' + fmt(ib + shift * 1000);
+      });
+      return out + '\n\n共平移 ' + count + ' 条时间轴，偏移 ' + nf(shift, 3) + ' 秒';
+    }
+  });
+
+  t2text({
+    id: 'jsonpath', cat: 'dev', icon: '🧭', name: 'JSON 路径取值',
+    desc: '用点号或方括号路径直接取出嵌套字段，不用写代码',
+    rows: 5, ph: '{"a":{"b":[10,20]}}',
+    param: { label: '路径', type: 'text', value: 'a.b[1]' },
+    fn: function (s, path) {
+      var obj;
+      try { obj = JSON.parse(s); } catch (e) { throw new Error('JSON 解析失败：' + e.message); }
+      var tokens = String(path || '').replace(/\[(\d+)\]/g, '.$1').split('.').filter(function (t) { return t !== ''; });
+      if (!tokens.length) throw new Error('请输入路径，例如 a.b[0].c');
+      var cur = obj, walked = [];
+      tokens.forEach(function (t) {
+        if (cur === null || cur === undefined) throw new Error('路径在 .' + t + ' 前中断');
+        cur = cur[t];
+        walked.push(t);
+      });
+      var val = cur;
+      return {
+        lines: [
+          ['路径', tokens.join('.')],
+          ['类型', Array.isArray(val) ? '数组（' + val.length + ' 项）' : val === null ? 'null' : typeof val],
+          ['取值', typeof val === 'object' ? JSON.stringify(val, null, 2).slice(0, 600) : String(val)],
+          ['可用键', val && typeof val === 'object' && !Array.isArray(val) ? Object.keys(val).join(', ') : '—']
+        ]
+      };
+    }
+  });
+
+  t2text({
+    id: 'sqlparam', cat: 'dev', icon: '🔁', name: 'SQL 占位符转换',
+    desc: '在 ?、$1、%s、:name 之间互转，换数据库驱动时省事',
+    rows: 4, ph: "select * from t where a=? and b=?",
+    param: { label: '目标风格', type: 'select', value: 'dollar', options: [['dollar', '$1 $2'], ['qmark', '? ?'], ['percent', '%s %s'], ['named', ':p1 :p2']] },
+    fn: function (s, style) {
+      var idx = 0;
+      var out = s.replace(/(\?|\$\d+|\?:\w+|%s|:\w+)/g, function (m) {
+        idx++;
+        if (style === 'dollar') return '$' + idx;
+        if (style === 'qmark') return '?';
+        if (style === 'percent') return '%s';
+        return ':p' + idx;
+      });
+      return {
+        lines: [
+          ['转换后', out],
+          ['占位符数', String(idx)],
+          ['目标风格', style]
+        ]
+      };
+    }
+  });
+
+  t2text({
+    id: 'shellquote', cat: 'dev', icon: '🐚', name: 'Shell 参数转义',
+    desc: '给含空格与特殊符号的参数加上安全引号，避免命令注入',
+    rows: 4, ph: "my file's name.txt",
+    param: { label: '模式', type: 'select', value: 'posix', options: [['posix', 'POSIX 单引号'], ['double', '双引号转义'], ['url', 'URL 编码']] },
+    fn: function (s, mode) {
+      if (mode === 'url') return encodeURIComponent(s);
+      if (mode === 'double') return '"' + s.replace(/(["\\$`])/g, '\\$1') + '"';
+      return "'" + s.replace(/'/g, "'\\''") + "'";
+    }
+  });
+
+  t2text({
+    id: 'gitshort', cat: 'dev', icon: '🌿', name: 'Git 命令速查',
+    desc: '按关键词找常用 git 命令，含撤销、冲突、日志等高频场景',
+    rows: 2, ph: '撤销 或 分支',
+    fn: function (s) {
+      var list = [
+        ['撤销工作区改动', 'git restore <file>'],
+        ['撤销暂存', 'git restore --staged <file>'],
+        ['改写最近一次提交', 'git commit --amend --no-edit'],
+        ['查看精简日志', 'git log --oneline --graph --decorate -20'],
+        ['看某行谁写的', 'git blame -L 10,20 <file>'],
+        ['新建并切分支', 'git switch -c feat/x'],
+        ['列出已合并分支', 'git branch --merged main'],
+        ['删除远程分支', 'git push origin --delete feat/x'],
+        ['拉取并变基', 'git pull --rebase'],
+        ['临时保存现场', 'git stash push -m "wip"'],
+        ['恢复现场', 'git stash pop'],
+        ['找引入 bug 的提交', 'git bisect start'],
+        ['冲突后标记已解决', 'git add <file> && git rebase --continue'],
+        ['查看远程地址', 'git remote -v'],
+        ['改最近提交作者', 'git commit --amend --author="XK <pxb7675@outlook.com>"'],
+        ['找回误删分支', 'git reflog'],
+        ['只提交部分改动', 'git add -p'],
+        ['查看文件历史', 'git log --follow -p <file>'],
+        ['比对两分支差异', 'git diff main...feat/x --stat'],
+        ['清理未跟踪文件', 'git clean -nd（先看再删）']
+      ];
+      var t = s.trim();
+      if (!t) return { lines: list };
+      var hits = list.filter(function (kv) { return kv[0].indexOf(t) >= 0 || kv[1].indexOf(t) >= 0; });
+      if (!hits.length) throw new Error('没有匹配的命令，换个关键词');
+      return { lines: hits };
+    }
+  });
+
+  t2text({
+    id: 'avatar', cat: 'file', icon: '🙂', name: '首字母头像',
+    desc: '把名字生成 SVG 头像 data URI，配色由名字决定，稳定不重复',
+    rows: 2, ph: '星空',
+    fn: function (s) {
+      var name = s.trim() || 'XK';
+      var chars = Array.from(name);
+      var initial = chars.slice(0, 2).join('').toUpperCase();
+      var hash = 0;
+      chars.forEach(function (c) { hash = (hash * 31 + c.codePointAt(0)) % 360; });
+      var bg = 'hsl(' + hash + ' 65% 28%)';
+      var fg = 'hsl(' + hash + ' 80% 82%)';
+      var svg = '<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">'
+        + '<rect width="128" height="128" rx="28" fill="' + bg + '"/>'
+        + '<text x="64" y="82" font-family="system-ui,sans-serif" font-size="56" font-weight="700" fill="' + fg + '" text-anchor="middle">'
+        + initial.replace(/[<>&]/g, '') + '</text></svg>';
+      var uri = 'data:image/svg+xml,' + encodeURIComponent(svg);
+      return {
+        lines: [
+          ['首字母', initial],
+          ['配色', bg + ' / ' + fg],
+          ['尺寸', String(uri.length) + ' 字符'],
+          ['data URI', uri]
+        ]
+      };
+    }
+  });
+
+  t2text({
+    id: 'mdtable', cat: 'text', icon: '🗂️', name: '文本对齐转表格',
+    desc: '把空格或制表符分隔的文本转成 Markdown 表格，第一行当表头',
+    rows: 6, ph: '姓名 城市 备注\n张三 上海 常驻',
+    fn: function (s) {
+      var rows = s.split(/\r?\n/).filter(function (l) { return l.trim(); }).map(function (l) {
+        return l.trim().split(/\t+|\s{2,}|\s*\|\s*/).map(function (c) { return c.trim(); });
+      });
+      if (!rows.length) throw new Error('没有内容');
+      var width = Math.max.apply(null, rows.map(function (r) { return r.length; }));
+      rows.forEach(function (r) { while (r.length < width) r.push(''); });
+      var out = ['| ' + rows[0].join(' | ') + ' |', '| ' + rows[0].map(function () { return '---'; }).join(' | ') + ' |'];
+      rows.slice(1).forEach(function (r) { out.push('| ' + r.map(function (c) { return c.replace(/\|/g, '\\|'); }).join(' | ') + ' |'); });
+      return out.join('\n') + '\n\n' + rows.length + ' 行 × ' + width + ' 列';
+    }
+  });
+
+  t2text({
+    id: 'outline', cat: 'text', icon: '📑', name: 'Markdown 大纲',
+    desc: '提取标题层级生成树状大纲，检查文档结构是否合理',
+    rows: 6, ph: '# 标题\n## 小节\n正文',
+    fn: function (s) {
+      var lines = s.split(/\r?\n/), stack = [], out = [], count = 0;
+      lines.forEach(function (l) {
+        var m = l.match(/^(#{1,6})\s+(.*)$/);
+        if (!m) return;
+        count++;
+        var level = m[1].length;
+        while (stack.length && stack[stack.length - 1].level >= level) stack.pop();
+        var prefix = stack.length ? '  '.repeat(stack.length - 1) + '└ ' : '';
+        out.push(prefix + '#'.repeat(level) + ' ' + m[2].trim());
+        stack.push({ level: level, text: m[2] });
+      });
+      if (!count) throw new Error('没有找到 Markdown 标题（# 开头）');
+      return { lines: [['标题数', String(count)], ['结构', out.join('\n')]] };
+    }
+  });
+
+  t2js({
+    id: 'tts', cat: 'text', icon: '🔊', name: '文本朗读',
+    desc: '调用系统语音朗读文本，可选语速与音调，纯本地不上传'
+  }, function (card) {
+    var ta = t2ta(4, '要朗读的文本…');
+    ta.value = '星空全能工具站，一切都在本地运行。';
+    var rate = t2mkParam({ label: '语速', type: 'number', value: 1, min: 0.5, max: 2, step: 0.1 });
+    var outEl = t2out();
+    var bar = el('div', 'row');
+    var speak = el('button', 't-btn'); speak.type = 'button'; speak.textContent = '朗读';
+    var stop = el('button', 't-btn ghost'); stop.type = 'button'; stop.textContent = '停止';
+    var supported = 'speechSynthesis' in window;
+    if (!supported) { outEl.className = 'out err'; outEl.textContent = '⚠ 当前浏览器不支持语音合成'; }
+    speak.addEventListener('click', function () {
+      if (!supported) return;
+      window.speechSynthesis.cancel();
+      var u = new SpeechSynthesisUtterance(ta.value);
+      u.rate = Number(rate.input.value) || 1;
+      u.lang = /[\u4e00-\u9fa5]/.test(ta.value) ? 'zh-CN' : 'en-US';
+      u.addEventListener('end', function () { outEl.className = 'out'; outEl.textContent = '朗读完成'; });
+      window.speechSynthesis.speak(u);
+      outEl.className = 'out';
+      outEl.textContent = '正在朗读 ' + Array.from(ta.value).length + ' 个字符…';
+    });
+    stop.addEventListener('click', function () {
+      if (supported) window.speechSynthesis.cancel();
+      outEl.className = 'out';
+      outEl.textContent = '已停止';
+    });
+    bar.appendChild(speak); bar.appendChild(stop);
+    card.appendChild(ta); card.appendChild(rate.wrap); card.appendChild(bar); card.appendChild(outEl);
+  });
+
+  t2text({
+    id: 'vlsm', cat: 'net', icon: '🪓', name: '子网切分',
+    desc: '把一个网段等分成若干子网，列出每个子网的可用范围',
+    rows: 2, ph: '192.168.1.0/24',
+    param: { label: '切成几份', type: 'select', value: '4', options: [['2', '2 份'], ['4', '4 份'], ['8', '8 份'], ['16', '16 份']] },
+    fn: function (s, n) {
+      var m = String(s).trim().match(/^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\/(\d{1,2})$/);
+      if (!m) throw new Error('写成 a.b.c.d/掩码，例如 192.168.1.0/24');
+      var oct = m[1].split('.').map(Number);
+      if (oct.some(function (o) { return o > 255; })) throw new Error('每段 0–255');
+      var prefix = Number(m[2]);
+      if (prefix > 30) throw new Error('掩码需要 ≤ 30');
+      var parts = t2int(n);
+      var extra = Math.log2(parts);
+      if (Math.floor(extra) !== extra) throw new Error('份数需为 2 的幂');
+      var newPrefix = prefix + extra;
+      if (newPrefix > 30) throw new Error('切完掩码会超过 /30');
+      var base = ((oct[0] << 24) | (oct[1] << 16) | (oct[2] << 8) | oct[3]) >>> 0;
+      var mask = ~((1 << (32 - newPrefix)) - 1) >>> 0;
+      var blockSize = Math.pow(2, 32 - newPrefix);
+      function ip(n2) { return [(n2 >>> 24) & 255, (n2 >>> 16) & 255, (n2 >>> 8) & 255, n2 & 255].join('.'); }
+      var net = (base & mask) >>> 0;
+      var lines = [['原始网段', m[1] + '/' + prefix], ['新掩码', '/' + newPrefix + '（每段 ' + blockSize + ' 个地址）']];
+      for (var i = 0; i < parts; i++) {
+        var start = (net + i * blockSize) >>> 0;
+        var end = (start + blockSize - 1) >>> 0;
+        lines.push(['子网 ' + (i + 1), ip(start) + '/' + newPrefix + ' · 可用 ' + ip(start + 1) + ' – ' + ip(end - 1)]);
+      }
+      return { lines: lines };
+    }
+  });
 
   /* ---------------- 渲染 ---------------- */
   var grid = $('#tgrid');
