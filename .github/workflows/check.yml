@@ -11,9 +11,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: JS 语法检�?        run: node --check main.js script.js
+      - name: JS 语法检查
+        run: |
+          node --check main.js
+          node --check script.js
 
-      - name: HTML 结构与本地引用检�?        run: |
+      - name: HTML 结构与本地引用检查
+        run: |
           python3 - <<'EOF'
           import re, os, sys
           from html.parser import HTMLParser
