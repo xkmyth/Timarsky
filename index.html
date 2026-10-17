@@ -21,7 +21,6 @@
     <a href="#m2">CAD</a>
     <a href="#m3">Office</a>
     <a href="#m4">PS</a>
-    <a href="#m5">编程</a>
     <a href="#m6">运维</a>
   </div>
   <button class="toggle" id="themeToggle">浅色模式</button>
@@ -2854,19 +2853,19 @@ HSL工具单独调整特定颜色的饱和/明度<br>
 
 <style>
 #backToTop{position:fixed;bottom:30px;right:30px;z-index:999;width:44px;height:44px;
-border-radius:50%;background:linear-gradient(135deg,#3b82f6,#60a5fa);color:#fff;
+border-radius:50%;background:linear-gradient(135deg,#f59e0b,#fcd34d);color:#3b2505;
 border:none;font-size:20px;cursor:pointer;opacity:0;transform:translateY(20px);
-transition:all 0.3s ease;box-shadow:0 4px 15px rgba(59,130,246,0.3)}
+transition:all 0.3s ease;box-shadow:0 4px 15px rgba(245,158,11,0.3)}
 #backToTop.show{opacity:1;transform:translateY(0)}
-#backToTop:hover{transform:translateY(-3px);box-shadow:0 6px 20px rgba(59,130,246,0.5)}
-.light #backToTop{background:linear-gradient(135deg,#2563eb,#3b82f6)}
+#backToTop:hover{transform:translateY(-3px);box-shadow:0 6px 20px rgba(245,158,11,0.5)}
+.light #backToTop{background:linear-gradient(135deg,#d97706,#f59e0b);color:#fff}
 </style>
 <button id="backToTop" onclick="window.scrollTo({top:0,behavior:'smooth'})">&#8593;</button>
 <script>window.addEventListener('scroll',function(){
 document.getElementById('backToTop').classList.toggle('show',window.scrollY>300);});</script>
 
 <div class="footer">
-  <p>© 2026 星空神话 xkmyth · 星空全能工具站 · 收录 723 个实用工具与技巧</p>
+  <p>© <span id="year">2026</span> 星空神话 xkmyth · 星空全能工具站 · 收录 723 个实用工具与技巧</p>
   <p style="margin-top:8px;font-size:12px">仅供学习交流 · 欢迎收藏使用 · <a href="https://xkmyth.github.io/about/" style="color:inherit">关于 xkmyth</a></p>
 </div>
 
