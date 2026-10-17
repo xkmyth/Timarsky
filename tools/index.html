@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="xkmyth 在线工具箱 —— 时间戳、Base64、URL、JSON、文本统计、SHA-256、密码生成、UUID、颜色、进制、命名风格，纯前端离线可用，全部带动效。">
+<title>工具箱 · 星空全能工具站 · xkmyth</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='45' r='16' fill='%23fcd34d'/><path d='M50 20v50M25 45h50' stroke='%23fcd34d' stroke-width='6'/><ellipse cx='50' cy='66' rx='26' ry='8' stroke='%239ae3ff' stroke-width='3' fill='none' transform='rotate(-15 50 66)'/></svg>">
+<link rel="stylesheet" href="tools.css">
+</head>
+<body>
+<canvas id="sky"></canvas>
+
+<header class="header">
+  <div class="logo"><a href="../">★ xkmyth</a> · 在线工具箱</div>
+  <div class="nav">
+    <a href="../">速查手册</a>
+    <a href="../#m1">Windows</a>
+    <a href="../#m2">CAD</a>
+    <a href="https://xkmyth.github.io/">主站</a>
+  </div>
+</header>
+
+<section class="hero">
+  <p class="hero-eyebrow">TOOLKIT · 纯前端 · 数据不出浏览器</p>
+  <h1 class="hero-title">在<span class="gold">工具箱</span></h1>
+  <p class="hero-sub">11 个开箱即用的在线工具 · 输入即出结果 · 不上传任何数据</p>
+  <div class="hero-live">
+    <span class="live-dot"></span>
+    <span id="liveClock">--:--:--</span>
+    <span class="live-sep">·</span>
+    <span id="liveTs">0</span>
+    <span class="live-sep">·</span>
+    <span id="liveCount">0</span> 个工具已就绪
+  </div>
+</section>
+
+<nav class="chips" id="chips" aria-label="工具分类">
+  <button class="chip active" data-cat="all">全部</button>
+  <button class="chip" data-cat="enc">编码转换</button>
+  <button class="chip" data-cat="text">文本处理</button>
+  <button class="chip" data-cat="time">时间日期</button>
+  <button class="chip" data-cat="safe">安全随机</button>
+  <button class="chip" data-cat="num">数值颜色</button>
+</nav>
+
+<main class="tgrid" id="tgrid"></main>
+
+<footer class="foot">
+  <p>© <span id="year">2026</span> 星空神话 xkmyth · 工具箱 · 所有计算都在你的浏览器里完成</p>
+  <p class="foot-links">
+    <a href="../">速查手册</a> ·
+    <a href="https://xkmyth.github.io/">主站</a> ·
+    <a href="https://xkmyth.github.io/xkmyth/">Downloads</a> ·
+    <a href="https://xkmyth.github.io/support/">反馈</a>
+  </p>
+</footer>
+
+<div class="toast" id="toast"></div>
+<script src="tools.js"></script>
+</body>
+</html>
